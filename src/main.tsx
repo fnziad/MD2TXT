@@ -2,41 +2,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client';
 import {
   AlertCircle,
-  ArrowDown,
-  Bold,
   Check,
-  ChevronDown,
-  Clipboard,
-  Code,
-  Copy,
   Download,
   ExternalLink,
-  FileCheck,
   FileDown,
   FileText,
-  FlaskConical,
-  Info,
-  Italic,
   LoaderCircle,
-  Quote,
   RotateCcw,
-  Settings2,
-  Sigma,
+  Sliders,
   Sparkles,
-  Table,
-  Trash2,
-  Upload,
   X,
 } from 'lucide-react';
 import { DEFAULT_SETTINGS, type ConvertedDocument, type Diagnostic, type DocumentSettings } from './core/types';
 import { EDGE_CASE_SAMPLE, RASGAP_SAMPLE, SCIENCE_SAMPLE } from './core/samples';
 import './styles.css';
-import '@fontsource/noto-sans/400.css';
-import '@fontsource/noto-sans/500.css';
-import '@fontsource/noto-sans/600.css';
-import '@fontsource/noto-sans/700.css';
-import '@fontsource/noto-sans-bengali/400.css';
-import '@fontsource/noto-sans-symbols-2/400.css';
 
 type Notice = { message: string; type: 'success' | 'error' };
 type ExportKind = 'pdf' | 'docx' | 'gdocs';
@@ -314,7 +293,7 @@ function App() {
       const unwrapped = unwrapDocumentSource(source);
       if (unwrapped !== null) {
         setSource(unwrapped);
-        notify('Markdown code fences cleaned up');
+        notify('Markdown code block formatting removed');
       }
     }
   }
@@ -327,9 +306,9 @@ function App() {
   const statusLabel = useMemo(() => {
     if (busy) return 'Formatting notes…';
     if (error) return 'Render error';
-    if (errors.length > 0) return `${errors.length} issue${errors.length === 1 ? '' : 's'} (click to view)`;
+    if (errors.length > 0) return `${errors.length} issue${errors.length === 1 ? '' : 's'} (view)`;
     if (warnings.length > 0) return `${warnings.length} formatting tip${warnings.length === 1 ? '' : 's'} (view)`;
-    return 'Ready to download';
+    return 'All clear · Ready to download';
   }, [busy, error, errors.length, warnings.length]);
 
   function handleStatusClick() {
@@ -339,586 +318,770 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="MD2TXT home">
-          <img src="/logo.png" alt="MD2TXT icon" className="brand-logo" />
-          <div className="brand-info">
-            <span className="brand-title">
-              MD2TXT <span className="beta-badge">BETA</span>
-            </span>
-            <span className="brand-subtitle">AI Notes to Beautiful Docs</span>
+    <div className="bg-[#f5f7fb] text-slate-800 antialiased font-sans min-h-screen flex flex-col">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200/80 px-4 lg:px-8 py-2.5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          {/* Logo and App Title */}
+          <div className="flex items-center gap-3">
+            <a href="#top" className="flex items-center gap-3 group">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-900 via-indigo-700 to-indigo-500 flex items-center justify-center shadow-sm text-white overflow-hidden p-0.5">
+                <img src="/logo.png" alt="MD2TXT" className="w-full h-full object-cover rounded-[10px]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 tracking-tight text-base leading-none">MD2TXT</span>
+                  <span className="text-[10px] font-semibold bg-indigo-50 text-brand-600 px-1.5 py-0.5 rounded tracking-wide border border-indigo-100">
+                    BETA
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-tight mt-0.5 font-normal">AI Notes to Beautiful Docs</p>
+              </div>
+            </a>
           </div>
-        </a>
 
-        <button
-          type="button"
-          className={`status-pill ${errors.length || error ? 'has-errors' : busy ? 'is-busy' : 'is-ready'} ${hasIssues ? 'is-interactive' : ''}`}
-          onClick={handleStatusClick}
-          title={hasIssues ? 'Click to jump to formatting notes' : 'Notes are valid and ready to export'}
-        >
-          <span className="status-dot"></span>
-          {busy ? <LoaderCircle className="spin" /> : errors.length || error ? <AlertCircle /> : <Check />}
-          <span>{statusLabel}</span>
-        </button>
-
-        <div className="header-actions">
+          {/* Center Status Pill */}
           <button
             type="button"
-            className="ghost-button quick-action"
-            onClick={() => startDownloadPrompt('pdf')}
-            disabled={!source || busy}
+            onClick={handleStatusClick}
+            className={`hidden md:flex items-center gap-2 text-xs font-medium px-3.5 py-1.5 rounded-full border transition-colors ${
+              errors.length || error
+                ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
+                : busy
+                  ? 'bg-slate-100 border-slate-200 text-slate-700'
+                  : hasIssues
+                    ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100/70 cursor-pointer'
+                    : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100/70 cursor-pointer'
+            }`}
           >
-            <FileDown /> <span>Download PDF</span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                errors.length || error ? 'bg-rose-500' : busy ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'
+              }`}
+            />
+            {busy ? (
+              <LoaderCircle className="w-3.5 h-3.5 spin" />
+            ) : errors.length || error ? (
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+            ) : (
+              <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+            )}
+            <span>{statusLabel}</span>
           </button>
+
+          {/* Right Action Button */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => startDownloadPrompt('pdf')}
+              disabled={!source || busy}
+              className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FileDown className="w-4 h-4" />
+              <span>Download PDF</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      <main id="top" className="workspace">
-        <section className="hero">
-          <div className="hero-content">
-            <div className="eyebrow">
-              <Sparkles /> Designed for students, researchers &amp; learners
+      {/* Main Content */}
+      <main id="top" className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-7">
+        {/* Hero Section */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2 pb-4">
+          {/* Left Column: Copy & Samples */}
+          <div className="lg:col-span-7 space-y-5">
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider text-brand-600 uppercase">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>DESIGNED FOR STUDENTS, RESEARCHERS &amp; LEARNERS</span>
             </div>
-            <h1>
-              Your notes,
-              <br />
-              <em>beautifully translated.</em>
+
+            <h1 className="text-4xl sm:text-5xl lg:text-[54px] tracking-tight font-extrabold text-slate-900 leading-[1.08]">
+              Your notes, <br />
+              <span className="italic-serif text-brand-500 font-normal tracking-normal text-[1.12em]">
+                beautifully translated.
+              </span>
             </h1>
-            <p>
+
+            <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
               Paste Markdown from Gemini, ChatGPT, Claude, or any AI tool. Keep every math formula, chemistry equation,
               table, and formatted detail clean and readable.
             </p>
 
-            <div className="sample-chips" aria-label="Load sample documents">
-              <span className="sample-label">Try sample:</span>
+            {/* Quick Sample Buttons */}
+            <div className="pt-2 flex flex-wrap items-center gap-2.5">
+              <span className="text-xs text-slate-400 font-medium mr-1">Try sample:</span>
               <button
                 type="button"
-                className="sample-chip"
                 onClick={() => {
                   setSource(SCIENCE_SAMPLE);
                   setSettings((s) => ({ ...s, title: 'Science & Chemistry Notes' }));
                   notify('Loaded Science sample');
                 }}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-sm transition-colors cursor-pointer"
               >
-                <FlaskConical /> Science &amp; Chem
+                <span>🧪</span>
+                <span>Science &amp; Chem</span>
               </button>
+
               <button
                 type="button"
-                className="sample-chip"
                 onClick={() => {
                   setSource(RASGAP_SAMPLE);
                   setSettings((s) => ({ ...s, title: 'Cell Biology - RasGAP Pathway' }));
                   notify('Loaded Biology sample');
                 }}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-sm transition-colors cursor-pointer"
               >
-                🧬 Biology &amp; Pathways
+                <span>🧬</span>
+                <span>Biology &amp; Pathways</span>
               </button>
+
               <button
                 type="button"
-                className="sample-chip"
                 onClick={() => {
                   setSource(EDGE_CASE_SAMPLE);
                   setSettings((s) => ({ ...s, title: 'Math & Equations Sheet' }));
                   notify('Loaded Math sample');
                 }}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-sm transition-colors cursor-pointer"
               >
-                <Sigma /> Math &amp; Equations
+                <span className="font-serif font-bold text-sm">∑</span>
+                <span>Math &amp; Equations</span>
               </button>
             </div>
           </div>
 
-          <div className="flow-card">
-            <div className="flow-step">
-              <span className="flow-tag">INPUT</span>
-              <strong>Paste AI Notes</strong>
-              <small>Math, chemistry, lists &amp; tables</small>
-            </div>
-            <div className="flow-arrow">
-              <ArrowDown />
-            </div>
-            <div className="flow-step">
-              <span className="flow-tag engine">ENGINE</span>
-              <strong>Smart Formatter</strong>
-              <small>Renders formulas &amp; typography cleanly</small>
-            </div>
-            <div className="flow-arrow">
-              <ArrowDown />
-            </div>
-            <div className="flow-step highlight">
-              <span className="flow-tag ready">OUTPUT</span>
-              <strong>PDF &bull; Word &bull; Google Docs</strong>
-              <small>Clean downloads ready to submit or share</small>
+          {/* Right Column: Workflow Pipeline Stepper Card */}
+          <div className="lg:col-span-5">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-sm space-y-2">
+              {/* Step 1: Input */}
+              <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">Input</span>
+                <div className="text-xs font-bold text-slate-800">Paste AI Notes</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Math, chemistry, lists &amp; tables</div>
+              </div>
+
+              {/* Down Arrow 1 */}
+              <div className="flex justify-center text-slate-300">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+
+              {/* Step 2: Engine */}
+              <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-brand-600 block mb-0.5">Engine</span>
+                <div className="text-xs font-bold text-slate-800">Smart Formatter</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Renders formulas &amp; typography cleanly</div>
+              </div>
+
+              {/* Down Arrow 2 */}
+              <div className="flex justify-center text-slate-300">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+
+              {/* Step 3: Output */}
+              <div className="bg-indigo-50/60 rounded-xl p-3.5 border border-indigo-100">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-brand-600 block mb-0.5">Output</span>
+                <div className="text-xs font-bold text-brand-700">PDF &bull; Word &bull; Google Docs</div>
+                <div className="text-[11px] text-slate-600 mt-0.5">Clean downloads ready to submit or share</div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Convenient Document Bar right above the workspace */}
-        <section className="document-bar" aria-label="Document settings and title">
-          <div className="doc-title-wrapper">
-            <FileText className="doc-icon" />
-            <div className="doc-title-input-container">
-              <label htmlFor="doc-title-input" className="sr-only">
-                Document Title
-              </label>
-              <input
-                id="doc-title-input"
-                type="text"
-                className="doc-title-input"
-                value={settings.title}
-                onChange={(e) => setSettings({ ...settings, title: e.target.value })}
-                placeholder="Give your document a title (e.g. Biology Notes)..."
-                title="Click to rename document"
-              />
-            </div>
+        {/* Document Settings Bar */}
+        <div className="bg-white rounded-xl border border-slate-200 p-2.5 sm:px-4 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* Document Title Input */}
+          <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
+            <FileText className="w-4 h-4 text-brand-500 shrink-0" />
+            <input
+              aria-label="Document Title"
+              className="font-semibold text-slate-800 bg-transparent border-0 focus:ring-0 p-0 text-xs sm:text-sm w-full focus:outline-none placeholder-slate-400"
+              type="text"
+              value={settings.title}
+              onChange={(e) => setSettings({ ...settings, title: e.target.value })}
+              placeholder="Enter document title..."
+            />
           </div>
 
-          <div className="doc-settings-pills">
-            <div className="pill-group" title="Page size for PDF">
+          {/* Controls & Format Toggles */}
+          <div className="flex items-center flex-wrap gap-2">
+            {/* Paper Size Toggle */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium text-slate-600">
               <button
                 type="button"
-                className={`pill-btn ${settings.paper === 'A4' ? 'active' : ''}`}
                 onClick={() => setSettings({ ...settings, paper: 'A4' })}
+                className={`px-2.5 py-1 rounded-md transition-all ${
+                  settings.paper === 'A4' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
+                }`}
               >
                 A4
               </button>
               <button
                 type="button"
-                className={`pill-btn ${settings.paper === 'Letter' ? 'active' : ''}`}
                 onClick={() => setSettings({ ...settings, paper: 'Letter' })}
+                className={`px-2.5 py-1 rounded-md transition-all ${
+                  settings.paper === 'Letter' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
+                }`}
               >
                 Letter
               </button>
             </div>
 
-            <div className="pill-group" title="Page orientation">
+            {/* Orientation Toggle */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium text-slate-600">
               <button
                 type="button"
-                className={`pill-btn ${settings.orientation === 'portrait' ? 'active' : ''}`}
                 onClick={() => setSettings({ ...settings, orientation: 'portrait' })}
+                className={`px-2.5 py-1 rounded-md transition-all ${
+                  settings.orientation === 'portrait' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
+                }`}
               >
                 Portrait
               </button>
               <button
                 type="button"
-                className={`pill-btn ${settings.orientation === 'landscape' ? 'active' : ''}`}
                 onClick={() => setSettings({ ...settings, orientation: 'landscape' })}
+                className={`px-2.5 py-1 rounded-md transition-all ${
+                  settings.orientation === 'landscape' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
+                }`}
               >
                 Landscape
               </button>
             </div>
 
+            {/* Math Toggle Active Pill */}
             <button
               type="button"
-              className={`pill-btn toggle-pill ${settings.singleDollarMath ? 'active' : ''}`}
               onClick={() => setSettings({ ...settings, singleDollarMath: !settings.singleDollarMath })}
-              title="Recognize $...$ single-dollar inline math formulas"
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                settings.singleDollarMath
+                  ? 'bg-indigo-50 border border-indigo-200/80 text-brand-600 hover:bg-indigo-100'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
             >
-              <Sigma className="pill-icon" />
+              <span>∑</span>
               <span>$ Math: {settings.singleDollarMath ? 'On' : 'Off'}</span>
             </button>
 
+            {/* Margins & Size Button */}
             <button
               type="button"
-              className={`pill-btn more-settings ${showAdvancedSettings ? 'active' : ''}`}
               onClick={() => setShowAdvancedSettings((v) => !v)}
-              title="Adjust text size and margins"
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                showAdvancedSettings
+                  ? 'bg-slate-800 text-white border-slate-800'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
             >
-              <Settings2 className="pill-icon" />
+              <Sliders className="w-3.5 h-3.5" />
               <span>{showAdvancedSettings ? 'Close' : 'Margins & Size'}</span>
             </button>
           </div>
-        </section>
+        </div>
 
+        {/* Expandable Margins & Size Drawer */}
         {showAdvancedSettings && (
-          <section className="settings-drawer" aria-label="Page margins and text size">
-            <div className="drawer-row">
-              <label>
-                <span>Text size</span>
-                <input
-                  type="number"
-                  min="8"
-                  max="18"
-                  value={settings.fontSize}
-                  onChange={(e) => setSettings({ ...settings, fontSize: Number(e.target.value) })}
-                />
-              </label>
-              <label>
-                <span>Page Margins (mm)</span>
-                <input
-                  type="number"
-                  min="8"
-                  max="35"
-                  value={settings.margin}
-                  onChange={(e) => setSettings({ ...settings, margin: Number(e.target.value) })}
-                />
-              </label>
-              <button
-                type="button"
-                className="close-drawer-btn"
-                onClick={() => setShowAdvancedSettings(false)}
-                aria-label="Close settings"
-              >
-                <X />
-              </button>
+          <div className="bg-white rounded-xl border border-slate-200 p-4 -mt-4 shadow-sm flex flex-wrap items-center gap-6 text-xs text-slate-700">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-600">Base Font Size:</span>
+              <input
+                type="number"
+                min="8"
+                max="18"
+                value={settings.fontSize}
+                onChange={(e) => setSettings({ ...settings, fontSize: Number(e.target.value) })}
+                className="w-16 h-8 text-center rounded-lg border border-slate-200 text-xs font-semibold"
+              />
+              <span className="text-slate-400">pt</span>
             </div>
-          </section>
+
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-600">Page Margins:</span>
+              <input
+                type="number"
+                min="8"
+                max="35"
+                value={settings.margin}
+                onChange={(e) => setSettings({ ...settings, margin: Number(e.target.value) })}
+                className="w-16 h-8 text-center rounded-lg border border-slate-200 text-xs font-semibold"
+              />
+              <span className="text-slate-400">mm</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAdvancedSettings(false)}
+              className="ml-auto p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+              aria-label="Close drawer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         )}
 
-        <section className="converter-card">
-          <div className="panel editor-panel">
-            <div className="panel-header">
-              <div className="panel-title-group">
-                <span className="step">01</span>
-                <h2>Markdown Notes</h2>
+        {/* Dual Pane Workspace */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+          {/* LEFT PANE: Editor (Dark Canvas) */}
+          <div className="bg-editor-bg flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800">
+            {/* Left Pane Header & Toolbar */}
+            <div className="bg-editor-toolbar px-4 py-2.5 border-b border-editor-border flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold bg-slate-700/60 text-slate-300 px-1.5 py-0.5 rounded">
+                  01
+                </span>
+                <span className="text-xs font-semibold text-slate-200">Markdown Notes</span>
               </div>
-              <div className="panel-tools">
-                <div className="format-bar" aria-label="Formatting helpers">
+
+              {/* Markdown Actions Toolbar */}
+              <div className="flex items-center gap-1 text-slate-400">
+                <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-700/60 text-xs">
                   <button
                     type="button"
                     onClick={() => insertFormatting('**', '**', 'bold text')}
+                    className="w-6 h-6 flex items-center justify-center hover:text-white font-bold cursor-pointer"
                     title="Bold (**text**)"
                   >
-                    <Bold />
+                    B
                   </button>
                   <button
                     type="button"
                     onClick={() => insertFormatting('*', '*', 'italic text')}
+                    className="w-6 h-6 flex items-center justify-center hover:text-white italic font-serif cursor-pointer"
                     title="Italic (*text*)"
                   >
-                    <Italic />
+                    I
                   </button>
                   <button
                     type="button"
                     onClick={() => insertFormatting('`', '`', 'code')}
-                    title="Inline code (`code`)"
+                    className="w-6 h-6 flex items-center justify-center hover:text-white font-mono text-[10px] cursor-pointer"
+                    title="Code (`code`)"
                   >
-                    <Code />
+                    &lt;&gt;
                   </button>
                   <button
                     type="button"
                     onClick={() => insertFormatting('$', '$', '\\alpha + \\beta')}
-                    title="Inline math ($formula$)"
+                    className="w-6 h-6 flex items-center justify-center hover:text-white text-xs font-serif cursor-pointer"
+                    title="Math Formula ($...$)"
                   >
-                    <Sigma />
+                    ∑
                   </button>
                   <button
                     type="button"
-                    onClick={() => insertFormatting('> ', '', 'quoted text')}
+                    onClick={() => insertFormatting('> ', '', 'quoted thought')}
+                    className="w-6 h-6 flex items-center justify-center hover:text-white font-serif text-sm leading-none cursor-pointer"
                     title="Quote (>)"
                   >
-                    <Quote />
+                    &rdquo;
                   </button>
                   <button
                     type="button"
                     onClick={() =>
                       insertFormatting('| Column 1 | Column 2 |\n| :--- | :--- |\n| Item A | Value 1 |\n', '', '')
                     }
-                    title="Insert Table"
+                    className="w-6 h-6 flex items-center justify-center hover:text-white cursor-pointer"
+                    title="Table"
                   >
-                    <Table />
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <rect height="18" rx="2" width="18" x="3" y="3" />
+                      <line x1="3" x2="21" y1="9" y2="9" />
+                      <line x1="9" x2="9" y1="21" y2="21" />
+                    </svg>
                   </button>
                 </div>
-                <div className="tools-separator" />
-                <button type="button" className="tool-btn" onClick={paste} title="Paste from clipboard">
-                  <Clipboard /> <span>Paste</span>
-                </button>
+
+                <div className="h-4 w-px bg-slate-700 mx-1" />
+
+                {/* Utility Buttons */}
                 <button
                   type="button"
-                  className="tool-btn"
+                  onClick={paste}
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"
+                >
+                  <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Paste</span>
+                </button>
+
+                <input
+                  ref={fileInput}
+                  hidden
+                  type="file"
+                  accept=".md,.markdown,.txt,text/plain,text/markdown"
+                  onChange={(e) => loadFile(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
                   onClick={() => fileInput.current?.click()}
-                  title="Upload Markdown file"
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"
                 >
-                  <Upload /> <span>Upload</span>
+                  <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Upload</span>
                 </button>
+
                 <button
                   type="button"
-                  className="tool-btn danger"
                   onClick={clear}
-                  aria-label="Clear input"
-                  title="Clear all"
+                  className="p-1 text-slate-400 hover:text-rose-400 rounded cursor-pointer"
+                  title="Clear Editor"
                 >
-                  <Trash2 />
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
               </div>
             </div>
 
-            <input
-              ref={fileInput}
-              hidden
-              type="file"
-              accept=".md,.markdown,.txt,text/plain,text/markdown"
-              onChange={(e) => loadFile(e.target.files?.[0])}
-            />
+            {/* Left Pane Textarea */}
+            <div className="flex-1 flex flex-col">
+              <textarea
+                ref={textarea}
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                spellCheck={false}
+                placeholder={'Paste your AI notes here…\n\nFormulas like $E=mc^2$ or chemical equations render instantly.'}
+                aria-label="Markdown input"
+                className="w-full flex-1 p-5 font-mono text-[13px] leading-relaxed text-editor-text bg-editor-bg border-0 outline-none resize-none min-h-[420px] focus:ring-0"
+              />
+            </div>
 
-            <textarea
-              ref={textarea}
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-              spellCheck={false}
-              placeholder={'Paste your AI notes here…\n\nFormulas like $E=mc^2$ or chemical equations render instantly.'}
-              aria-label="Markdown input"
-            />
-
-            <div className="panel-footer">
-              <div className="editor-stats">
+            {/* Left Pane Footer Bar */}
+            <div className="px-4 py-2 bg-[#121721] border-t border-editor-border text-[11px] text-slate-400 flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <span>{charCount.toLocaleString()} chars</span>
-                <span className="dot-sep">&bull;</span>
+                <span>&bull;</span>
                 <span>{wordCount.toLocaleString()} words</span>
-                <span className="dot-sep">&bull;</span>
+                <span>&bull;</span>
                 <span>~{readTime} min read</span>
               </div>
               {lastCleared && !source && (
                 <button
                   type="button"
-                  className="undo-btn"
                   onClick={() => {
                     setSource(lastCleared);
                     setLastCleared('');
                   }}
+                  className="inline-flex items-center gap-1 text-indigo-300 hover:text-white"
                 >
-                  <RotateCcw /> Undo clear
+                  <RotateCcw className="w-3 h-3" /> Undo clear
                 </button>
               )}
             </div>
           </div>
 
-          <div className="panel preview-panel">
-            <div className="panel-header">
-              <div className="panel-title-group">
-                <span className="step">02</span>
-                <h2>Live Preview</h2>
+          {/* RIGHT PANE: Live Preview (Crisp White Canvas) */}
+          <div className="bg-white flex flex-col">
+            {/* Right Pane Header & Actions */}
+            <div className="bg-slate-50/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold bg-indigo-100 text-brand-600 px-1.5 py-0.5 rounded">
+                  02
+                </span>
+                <span className="text-xs font-semibold text-slate-800">Live Preview</span>
               </div>
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={outputMode === 'formatted' ? 'active' : ''}
-                  onClick={() => setOutputMode('formatted')}
-                >
-                  <FileCheck className="seg-icon" /> Formatted
-                </button>
-                <button
-                  type="button"
-                  className={outputMode === 'plain' ? 'active' : ''}
-                  onClick={() => setOutputMode('plain')}
-                >
-                  <FileText className="seg-icon" /> Clean Text
-                </button>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setOutputMode('formatted')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
+                      outputMode === 'formatted'
+                        ? 'bg-white text-slate-800 shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5 text-brand-500" />
+                    <span>Formatted</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOutputMode('plain')}
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-md transition-all ${
+                      outputMode === 'plain'
+                        ? 'bg-white text-slate-800 shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <line x1="4" x2="20" y1="6" y2="6" />
+                      <line x1="4" x2="14" y1="12" y2="12" />
+                      <line x1="4" x2="18" y1="18" y2="18" />
+                    </svg>
+                    <span>Clean Text</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className={`preview-scroll ${busy ? 'updating' : ''}`}>
+            {/* Right Pane Content */}
+            <div className={`p-6 sm:p-8 overflow-y-auto max-h-[500px] min-h-[420px] bg-white ${busy ? 'opacity-65' : ''}`}>
               {error ? (
-                <div className="empty-state error">
-                  <AlertCircle />
-                  <h3>Couldn’t render these notes</h3>
-                  <p>{error}</p>
+                <div className="flex flex-col items-center justify-center text-center p-8 text-slate-500 space-y-2">
+                  <AlertCircle className="w-8 h-8 text-rose-500" />
+                  <h3 className="font-bold text-slate-800 text-sm">Couldn’t render these notes</h3>
+                  <p className="text-xs max-w-sm">{error}</p>
                 </div>
               ) : !source ? (
-                <div className="empty-state">
-                  <FileText />
-                  <h3>Your document appears here</h3>
-                  <p>Paste Markdown on the left or choose a sample to see instant live rendering.</p>
+                <div className="flex flex-col items-center justify-center text-center p-8 text-slate-400 space-y-2">
+                  <FileText className="w-8 h-8 text-slate-300" />
+                  <h3 className="font-bold text-slate-700 text-sm">Your document appears here</h3>
+                  <p className="text-xs max-w-sm">Paste Markdown on the left or select a sample above to begin.</p>
                 </div>
               ) : outputMode === 'formatted' ? (
                 <article className="document-preview" dangerouslySetInnerHTML={{ __html: result?.html ?? '' }} />
               ) : (
-                <pre className="plain-preview">{result?.plainText}</pre>
+                <pre className="font-mono text-[13px] leading-relaxed text-slate-800 whitespace-pre-wrap">
+                  {result?.plainText}
+                </pre>
               )}
             </div>
 
-            <div className="panel-footer preview-meta">
-              <div className="preview-metrics">
+            {/* Right Pane Footer Bar */}
+            <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <span>
                   <strong>{wordCount.toLocaleString()}</strong> words
                 </span>
-                <span className="dot-sep">&bull;</span>
+                <span>&bull;</span>
                 <span>
                   <strong>{result?.stats.equations ?? 0}</strong> formulas
                 </span>
               </div>
-              <div className="preview-actions">
-                <button
-                  type="button"
-                  className={`copy-btn ${copiedMode === (outputMode === 'formatted' ? 'rich' : 'plain') ? 'copied' : ''}`}
-                  onClick={() => copy(outputMode === 'formatted')}
-                >
-                  {copiedMode === (outputMode === 'formatted' ? 'rich' : 'plain') ? <Check /> : <Copy />}
-                  <span>
-                    {copiedMode === (outputMode === 'formatted' ? 'rich' : 'plain')
-                      ? 'Copied!'
-                      : outputMode === 'formatted'
-                        ? 'Copy formatted'
-                        : 'Copy text'}
-                  </span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => copy(outputMode === 'formatted')}
+                className="inline-flex items-center gap-1 text-slate-700 hover:text-brand-600 font-medium px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-[11px] transition-colors cursor-pointer"
+              >
+                {copiedMode === (outputMode === 'formatted' ? 'rich' : 'plain') ? (
+                  <Check className="w-3 h-3 text-emerald-600" />
+                ) : (
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <rect height="13" rx="2" ry="2" width="13" x="9" y="9" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                )}
+                <span>{copiedMode === (outputMode === 'formatted' ? 'rich' : 'plain') ? 'Copied!' : 'Copy formatted'}</span>
+              </button>
             </div>
           </div>
-        </section>
+        </div>
 
+        {/* Document Formatting Check */}
         {hasIssues && (
-          <section ref={issuesRef} className="issues-card">
-            <div className="issues-heading">
-              <div className="issues-title">
-                <Info />
+          <section ref={issuesRef} className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-start gap-2.5">
+                <div className="mt-0.5 text-blue-500">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" x2="12" y1="16" y2="12" />
+                    <line x1="12" x2="12.01" y1="8" y2="8" />
+                  </svg>
+                </div>
                 <div>
-                  <h2>Document formatting check</h2>
-                  <p>Your notes are safe. Review these suggestions before exporting.</p>
+                  <h3 className="text-sm font-bold text-slate-900">Document formatting check</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Your notes are safe. Review these suggestions before exporting.</p>
                 </div>
               </div>
-              <span className="issues-count">{result!.diagnostics.length} items</span>
+              <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
+                {result!.diagnostics.length} {result!.diagnostics.length === 1 ? 'item' : 'items'}
+              </span>
             </div>
-            <div className="issue-list">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
               {result!.diagnostics.map((issue) => (
-                <div key={issue.id} className={`issue ${issue.severity}`}>
-                  {issue.severity === 'error' ? <AlertCircle /> : <Info />}
-                  <button type="button" className="issue-copy" onClick={() => selectIssue(issue)}>
-                    <strong>{issue.code.replace(/-/g, ' ')}</strong>
-                    <span>{issue.message}</span>
+                <div
+                  key={issue.id}
+                  className={`rounded-xl p-4 space-y-1.5 flex gap-3 items-start border ${
+                    issue.severity === 'error'
+                      ? 'bg-rose-50/50 border-rose-200 text-rose-900'
+                      : 'bg-amber-50/40 border-amber-200/70 text-slate-800'
+                  }`}
+                >
+                  <div className={`mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-rose-500' : 'text-amber-500'}`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" x2="12" y1="16" y2="12" />
+                      <line x1="12" x2="12.01" y1="8" y2="8" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-900 capitalize">{issue.code.replace(/-/g, ' ')}</h4>
+                      {issue.repair && (
+                        <button
+                          type="button"
+                          onClick={() => repair(issue)}
+                          className="text-[10px] font-bold text-brand-600 hover:text-brand-700 bg-white border border-brand-200 px-2 py-0.5 rounded cursor-pointer"
+                        >
+                          Fix
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-normal">{issue.message}</p>
                     {issue.range && (
-                      <small>
-                        Line {issue.range.line}, column {issue.range.column}
-                      </small>
+                      <button
+                        type="button"
+                        onClick={() => selectIssue(issue)}
+                        className="text-[10px] text-slate-400 font-mono pt-1 hover:text-slate-600 block text-left cursor-pointer"
+                      >
+                        Line {issue.range.line}, column {issue.range.column} (click to jump)
+                      </button>
                     )}
-                  </button>
-                  {issue.repair && (
-                    <button type="button" className="repair" onClick={() => repair(issue)}>
-                      Fix
-                    </button>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        <section className="export-card">
-          <div className="export-intro">
-            <div className="export-badge">
-              <span className="step">03</span> Download or Share
+        {/* Export Section */}
+        <section className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column Info */}
+            <div className="lg:col-span-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold bg-indigo-50 text-brand-600 px-1.5 py-0.5 rounded border border-indigo-100">
+                  03
+                </span>
+                <span className="text-[10px] tracking-wider uppercase font-bold text-slate-400">Download or Share</span>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 leading-tight">Export in Your Preferred Format</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Save clean PDF files for submission and printing, Word documents for offline editing, or send directly to
+                Google Docs.
+              </p>
             </div>
-            <h2>Export in Your Preferred Format</h2>
-            <p>
-              Save clean PDF files for submission and printing, Word documents for offline editing, or send directly
-              to Google Docs.
-            </p>
-          </div>
 
-          <div className="export-actions">
-            <button
-              type="button"
-              className="export-btn primary-export"
-              disabled={!source || busy || !!error || !!exporting}
-              onClick={() => startDownloadPrompt('pdf')}
-            >
-              <div className="export-icon-box">
-                {exporting === 'pdf' ? <LoaderCircle className="spin" /> : <FileDown />}
-              </div>
-              <div className="export-label">
-                <div className="export-top">
-                  <b>Download PDF</b>
-                  <span className="format-tag prime">Print Ready</span>
+            {/* Right Column Export Tiles */}
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Tile 1: PDF */}
+              <button
+                type="button"
+                disabled={!source || busy || !!error || !!exporting}
+                onClick={() => startDownloadPrompt('pdf')}
+                className="group text-left p-4 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-md shadow-brand-500/20 transition-all duration-150 flex items-start gap-3.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center shrink-0 mt-0.5">
+                  {exporting === 'pdf' ? (
+                    <LoaderCircle className="w-5 h-5 text-white spin" />
+                  ) : (
+                    <FileDown className="w-5 h-5 text-white" />
+                  )}
                 </div>
-                <small>Clean formulas, equations &amp; page layout</small>
-              </div>
-            </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm tracking-tight">Download PDF</span>
+                    <span className="text-[9px] font-semibold bg-white/25 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      Print Ready
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-indigo-100 mt-1 leading-snug">Clean formulas, equations &amp; page layout</p>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              className="export-btn secondary-export"
-              disabled={!source || busy || !!exporting}
-              onClick={() => startDownloadPrompt('docx')}
-            >
-              <div className="export-icon-box">
-                {exporting === 'docx' ? <LoaderCircle className="spin" /> : <Download />}
-              </div>
-              <div className="export-label">
-                <div className="export-top">
-                  <b>Download Word (.docx)</b>
-                  <span className="format-tag">Word</span>
+              {/* Tile 2: Word (.docx) */}
+              <button
+                type="button"
+                disabled={!source || busy || !!exporting}
+                onClick={() => startDownloadPrompt('docx')}
+                className="group text-left p-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs transition-all duration-150 flex items-start gap-3.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-slate-200 flex items-center justify-center shrink-0 mt-0.5 transition-colors">
+                  {exporting === 'docx' ? (
+                    <LoaderCircle className="w-5 h-5 text-slate-600 spin" />
+                  ) : (
+                    <Download className="w-5 h-5 text-slate-600" />
+                  )}
                 </div>
-                <small>Editable document with tables &amp; text</small>
-              </div>
-            </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-slate-800 tracking-tight">Download Word (.docx)</span>
+                    <span className="text-[9px] font-semibold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      Word
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">Editable document with tables &amp; text</p>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              className="export-btn secondary-export gdocs-btn"
-              disabled={!source || busy || !!exporting}
-              onClick={() => startDownloadPrompt('gdocs')}
-              title="Open directly in Google Docs"
-            >
-              <div className="export-icon-box gdocs-icon">
-                {exporting === 'gdocs' ? <LoaderCircle className="spin" /> : <ExternalLink />}
-              </div>
-              <div className="export-label">
-                <div className="export-top">
-                  <b>Export to Google Docs</b>
-                  <span className="format-tag gdocs-badge">Online</span>
+              {/* Tile 3: Google Docs */}
+              <button
+                type="button"
+                disabled={!source || busy || !!exporting}
+                onClick={() => startDownloadPrompt('gdocs')}
+                className="group text-left p-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs transition-all duration-150 flex items-start gap-3.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-lg bg-sky-50 group-hover:bg-sky-100 flex items-center justify-center shrink-0 mt-0.5 transition-colors">
+                  {exporting === 'gdocs' ? (
+                    <LoaderCircle className="w-5 h-5 text-sky-600 spin" />
+                  ) : (
+                    <ExternalLink className="w-5 h-5 text-sky-600" />
+                  )}
                 </div>
-                <small>Copies formatted notes &amp; opens docs.new</small>
-              </div>
-            </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-slate-800 tracking-tight">Export to Google Docs</span>
+                    <span className="text-[9px] font-semibold bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded uppercase tracking-wider border border-sky-100">
+                      Online
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">Copies formatted notes &amp; opens docs.new</p>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              className="export-btn secondary-export"
-              disabled={!source || busy}
-              onClick={downloadText}
-            >
-              <div className="export-icon-box">
-                <Download />
-              </div>
-              <div className="export-label">
-                <div className="export-top">
-                  <b>Plain Text (.txt)</b>
-                  <span className="format-tag">Text</span>
+              {/* Tile 4: Plain Text (.txt) */}
+              <button
+                type="button"
+                disabled={!source || busy}
+                onClick={downloadText}
+                className="group text-left p-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs transition-all duration-150 flex items-start gap-3.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-slate-200 flex items-center justify-center shrink-0 mt-0.5 transition-colors">
+                  <Download className="w-5 h-5 text-slate-600" />
                 </div>
-                <small>Clean text notes without markdown</small>
-              </div>
-            </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-slate-800 tracking-tight">Plain Text (.txt)</span>
+                    <span className="text-[9px] font-semibold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      Text
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">Clean text notes without markdown</p>
+                </div>
+              </button>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="app-footer">
-        <div className="footer-content">
-          <div className="footer-brand">
-            <div className="footer-logo-row">
-              <img src="/logo.png" alt="MD2TXT Logo" className="footer-logo" />
-              <div>
-                <strong className="footer-brand-name">MD2TXT</strong>
-                <span className="footer-tagline">Notes, beautifully translated.</span>
-              </div>
-            </div>
-            <p className="footer-desc">
-              Built for students and educators to turn messy AI study notes into clean, publication-ready documents with
-              accurate math and science formulas.
-            </p>
+      {/* Footer */}
+      <footer className="mt-auto py-8 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 space-y-2">
+          <p className="font-semibold text-slate-700">MD2TXT — AI Notes to Beautiful Documents</p>
+          <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400">
+            <span>
+              Crafted &amp; Developed by <strong className="text-slate-600 font-semibold">Ziad</strong>
+            </span>
+            <span>&bull;</span>
+            <span>100% Client-side preview privacy &bull; Zero data retention</span>
           </div>
-
-          <div className="footer-meta">
-            <div className="privacy-pill">
-              <span className="privacy-dot"></span>
-              <span>100% Client-side preview privacy &bull; Zero data retention</span>
-            </div>
-            <div className="developer-credit">
-              <span>Crafted &amp; Developed by</span>
-              <span className="credit-name">Ziad</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="footer-bottom">
-          <span>&copy; {new Date().getFullYear()} MD2TXT. Designed for clarity &amp; focus.</span>
-          <span className="footer-stats-note">Fast serverless export &bull; Works completely offline in your browser</span>
         </div>
       </footer>
 
       {notice && (
         <div className={`toast ${notice.type}`}>
-          {notice.type === 'success' ? <Check /> : <AlertCircle />}
+          {notice.type === 'success' ? <Check className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-400" />}
           <span>{notice.message}</span>
         </div>
       )}
@@ -927,7 +1090,7 @@ function App() {
       {downloadModal && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setDownloadModal(null)}>
           <div
-            className="modal download-prompt-modal"
+            className="modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="download-modal-title"
@@ -938,26 +1101,26 @@ function App() {
               onClick={() => setDownloadModal(null)}
               aria-label="Close download window"
             >
-              <X />
+              <X className="w-4 h-4" />
             </button>
-            <div className="modal-header-icon">
+            <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center mb-3.5">
               {downloadModal.kind === 'pdf' ? (
-                <FileDown className="modal-icon-pdf" />
+                <FileDown className="w-5 h-5 text-brand-600" />
               ) : downloadModal.kind === 'docx' ? (
-                <Download className="modal-icon-docx" />
+                <Download className="w-5 h-5 text-blue-600" />
               ) : (
-                <ExternalLink className="modal-icon-gdocs" />
+                <ExternalLink className="w-5 h-5 text-sky-600" />
               )}
             </div>
 
-            <h2 id="download-modal-title">
+            <h2 id="download-modal-title" className="text-lg font-bold text-slate-900">
               {downloadModal.kind === 'pdf'
                 ? 'Save as PDF'
                 : downloadModal.kind === 'docx'
                   ? 'Save as Word Document'
                   : 'Export to Google Docs'}
             </h2>
-            <p className="modal-subtitle">
+            <p className="text-xs text-slate-500 mt-1 mb-5">
               {downloadModal.kind === 'gdocs'
                 ? 'Give your document a title. It will be copied to your clipboard and opened in Google Docs.'
                 : 'Choose a filename for your download.'}
@@ -968,10 +1131,13 @@ function App() {
                 e.preventDefault();
                 handleConfirmDownloadModal();
               }}
+              className="space-y-4"
             >
-              <div className="form-group">
-                <label htmlFor="file-name-input">Document Name</label>
-                <div className="filename-input-box">
+              <div>
+                <label htmlFor="file-name-input" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Document Name
+                </label>
+                <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
                   <input
                     id="file-name-input"
                     type="text"
@@ -979,34 +1145,37 @@ function App() {
                     value={downloadModal.title}
                     onChange={(e) => setDownloadModal({ ...downloadModal, title: e.target.value })}
                     placeholder="Enter file name..."
+                    className="flex-1 h-10 px-3 text-sm font-semibold text-slate-800 border-0 outline-none focus:ring-0"
                   />
-                  <span className="filename-ext">
+                  <span className="px-3 text-xs font-bold text-slate-400 bg-slate-100 h-10 flex items-center border-l border-slate-200">
                     .{downloadModal.kind === 'pdf' ? 'pdf' : 'docx'}
                   </span>
                 </div>
               </div>
 
               {downloadModal.kind === 'pdf' && (
-                <div className="modal-options-row">
-                  <div className="form-group half">
-                    <label>Paper Size</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Paper Size</label>
                     <select
                       value={downloadModal.paper}
                       onChange={(e) =>
                         setDownloadModal({ ...downloadModal, paper: e.target.value as any })
                       }
+                      className="w-full h-9 rounded-lg border border-slate-300 text-xs px-2.5 bg-white"
                     >
                       <option value="A4">A4 Standard</option>
                       <option value="Letter">US Letter</option>
                     </select>
                   </div>
-                  <div className="form-group half">
-                    <label>Orientation</label>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Orientation</label>
                     <select
                       value={downloadModal.orientation}
                       onChange={(e) =>
                         setDownloadModal({ ...downloadModal, orientation: e.target.value as any })
                       }
+                      className="w-full h-9 rounded-lg border border-slate-300 text-xs px-2.5 bg-white"
                     >
                       <option value="portrait">Portrait</option>
                       <option value="landscape">Landscape</option>
@@ -1015,22 +1184,29 @@ function App() {
                 </div>
               )}
 
-              <div className="modal-actions">
-                <button type="button" onClick={() => setDownloadModal(null)}>
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDownloadModal(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
                   Cancel
                 </button>
-                <button type="submit" className="primary-modal-btn">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all cursor-pointer"
+                >
                   {downloadModal.kind === 'pdf' ? (
                     <>
-                      <FileDown className="btn-icon" /> Download PDF
+                      <FileDown className="w-3.5 h-3.5" /> Download PDF
                     </>
                   ) : downloadModal.kind === 'docx' ? (
                     <>
-                      <Download className="btn-icon" /> Download Word Doc
+                      <Download className="w-3.5 h-3.5" /> Download Word Doc
                     </>
                   ) : (
                     <>
-                      <ExternalLink className="btn-icon" /> Open Google Docs
+                      <ExternalLink className="w-3.5 h-3.5" /> Open Google Docs
                     </>
                   )}
                 </button>
@@ -1044,47 +1220,51 @@ function App() {
       {gdocsHelpOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setGDocsHelpOpen(false)}>
           <div
-            className="modal gdocs-help-modal"
+            className="modal max-w-md"
             role="dialog"
             aria-modal="true"
             aria-labelledby="gdocs-title"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <button className="modal-close" onClick={() => setGDocsHelpOpen(false)} aria-label="Close">
-              <X />
+              <X className="w-4 h-4" />
             </button>
-            <div className="gdocs-celebrate">
-              <ExternalLink className="gdocs-big-icon" />
+            <div className="w-12 h-12 rounded-full bg-sky-50 flex items-center justify-center mb-3">
+              <ExternalLink className="w-6 h-6 text-sky-600" />
             </div>
-            <h2 id="gdocs-title">Google Docs is ready!</h2>
-            <p>A new tab has opened with a blank Google Doc.</p>
+            <h2 id="gdocs-title" className="text-lg font-bold text-slate-900">Google Docs is ready!</h2>
+            <p className="text-xs text-slate-500 mt-1">A new tab has opened with a blank Google Doc.</p>
 
-            <div className="gdocs-instructions">
-              <div className="gdoc-instruction-step">
-                <span className="step-number">1</span>
+            <div className="space-y-3.5 my-5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-sky-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  1
+                </span>
                 <div>
-                  <strong>Paste directly (Fastest)</strong>
-                  <p>
-                    Click inside the new Google Doc tab and press <kbd>Ctrl</kbd>+<kbd>V</kbd> (or <kbd>⌘</kbd>+<kbd>V</kbd> on Mac). Your formatted notes, tables, and formulas are already copied!
+                  <strong className="text-xs text-slate-900 block font-semibold">Paste directly (Fastest)</strong>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    Click inside the new Google Doc tab and press <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">Ctrl</kbd>+<kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">V</kbd> (or <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">⌘</kbd>+<kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">V</kbd>). Your formatted notes, tables, and formulas are already copied!
                   </p>
                 </div>
               </div>
 
-              <div className="gdoc-instruction-step">
-                <span className="step-number">2</span>
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-slate-400 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  2
+                </span>
                 <div>
-                  <strong>Or open the downloaded .docx</strong>
-                  <p>
-                    We also saved <code>{safeName(settings.title)}.docx</code> to your downloads. You can upload it to Google Drive to open as a document anytime.
+                  <strong className="text-xs text-slate-900 block font-semibold">Or upload the downloaded .docx</strong>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    We also saved <code className="text-indigo-600 font-mono text-[10px]">{safeName(settings.title)}.docx</code> to your downloads. You can upload it to Google Drive anytime.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="modal-actions">
+            <div className="flex justify-end">
               <button
                 type="button"
-                className="primary-modal-btn"
+                className="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
                 onClick={() => setGDocsHelpOpen(false)}
               >
                 Got it, thanks!
@@ -1104,20 +1284,21 @@ function App() {
             aria-labelledby="fallback-title"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <button className="modal-close" onClick={() => setShowFallback(false)} aria-label="Close settings">
-              <X />
+            <button className="modal-close" onClick={() => setShowFallback(false)} aria-label="Close">
+              <X className="w-4 h-4" />
             </button>
-            <AlertCircle className="modal-icon" />
-            <h2 id="fallback-title">Review formula formatting</h2>
-            <p>Some symbols or equations need attention so they don&apos;t disappear in the final PDF.</p>
-            <ul>
+            <AlertCircle className="w-7 h-7 text-rose-600 mb-2" />
+            <h2 id="fallback-title" className="text-lg font-bold text-slate-900">Review formula formatting</h2>
+            <p className="text-xs text-slate-500 mt-1 mb-3">Some symbols or equations need attention so they don&apos;t disappear in the final PDF.</p>
+            <ul className="text-xs text-slate-600 space-y-1 list-disc pl-5 max-h-36 overflow-auto mb-4">
               {errors.slice(0, 4).map((item) => (
                 <li key={item.id}>{item.message}</li>
               ))}
             </ul>
-            <div className="modal-actions">
+            <div className="flex justify-end gap-2.5">
               <button
                 type="button"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                 onClick={() => {
                   setShowFallback(false);
                   textarea.current?.focus();
@@ -1127,7 +1308,7 @@ function App() {
               </button>
               <button
                 type="button"
-                className="danger-secondary"
+                className="px-4 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg cursor-pointer"
                 onClick={() => {
                   setShowFallback(false);
                   performExport('pdf', settings, true);
