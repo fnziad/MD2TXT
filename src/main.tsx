@@ -10,6 +10,7 @@ import {
   Code,
   Copy,
   Download,
+  ExternalLink,
   FileCheck,
   FileDown,
   FileText,
@@ -38,7 +39,22 @@ import '@fontsource/noto-sans-bengali/400.css';
 import '@fontsource/noto-sans-symbols-2/400.css';
 
 type Notice = { message: string; type: 'success' | 'error' };
-type ExportKind = 'pdf' | 'docx';
+type ExportKind = 'pdf' | 'docx' | 'gdocs';
+
+type DownloadModalState = {
+  kind: ExportKind;
+  title: string;
+  paper: 'A4' | 'Letter';
+  orientation: 'portrait' | 'landscape';
+} | null;
+
+function extractTitleFromMarkdown(text: string): string {
+  const match = text.match(/^#\s+(.+)$/m);
+  if (match && match[1]) {
+    return match[1].trim().replace(/[^\p{L}\p{N}\s._-]+/gu, '').slice(0, 80);
+  }
+  return '';
+}
 
 function useConversion(source: string, settings: DocumentSettings) {
   const worker = useRef<Worker | undefined>(undefined);
@@ -87,13 +103,16 @@ function App() {
   const [outputMode, setOutputMode] = useState<'formatted' | 'plain'>('formatted');
   const [lastCleared, setLastCleared] = useState('');
   const [notice, setNotice] = useState<Notice>();
-  const [showSettings, setShowSettings] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [exporting, setExporting] = useState<ExportKind>();
   const [showFallback, setShowFallback] = useState(false);
   const [copiedMode, setCopiedMode] = useState<string | null>(null);
+  const [downloadModal, setDownloadModal] = useState<DownloadModalState>(null);
+  const [gdocsHelpOpen, setGDocsHelpOpen] = useState(false);
 
   const textarea = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const issuesRef = useRef<HTMLElement>(null);
   const { result, error, busy } = useConversion(source, settings);
   const errors = result?.diagnostics.filter((d) => d.severity === 'error') ?? [];
   const warnings = result?.diagnostics.filter((d) => d.severity === 'warning') ?? [];
@@ -122,7 +141,12 @@ function App() {
 
   async function paste() {
     try {
-      setSource(await navigator.clipboard.readText());
+      const text = await navigator.clipboard.readText();
+      setSource(text);
+      const titleFromMarkdown = extractTitleFromMarkdown(text);
+      if (titleFromMarkdown && settings.title === DEFAULT_SETTINGS.title) {
+        setSettings((s) => ({ ...s, title: titleFromMarkdown }));
+      }
       notify('Pasted from clipboard');
     } catch {
       notify('Clipboard access was denied. Paste with your keyboard instead.', 'error');
@@ -161,17 +185,66 @@ function App() {
     notify('Text file downloaded');
   }
 
-  async function exportFile(kind: ExportKind, allowFallback = false) {
-    if (kind === 'pdf' && errors.length && !allowFallback) {
+  function startDownloadPrompt(kind: ExportKind) {
+    if (kind === 'pdf' && errors.length) {
       setShowFallback(true);
       return;
     }
+    const currentTitle = settings.title.trim() || extractTitleFromMarkdown(source) || 'Notes';
+    setDownloadModal({
+      kind,
+      title: currentTitle,
+      paper: settings.paper,
+      orientation: settings.orientation,
+    });
+  }
+
+  async function performExport(
+    kind: ExportKind,
+    customSettings: DocumentSettings,
+    allowFallback = false
+  ) {
+    if (kind === 'gdocs') {
+      setExporting('gdocs');
+      try {
+        if (result && navigator.clipboard.write && window.ClipboardItem) {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([result.clipboardHtml], { type: 'text/html' }),
+              'text/plain': new Blob([result.plainText], { type: 'text/plain' }),
+            }),
+          ]);
+        }
+        const response = await fetch('/api/export/docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, settings: customSettings, allowFallback }),
+        });
+        if (response.ok) {
+          const blob = await response.blob();
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `${safeName(customSettings.title)}.docx`;
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }
+        window.open('https://docs.new', '_blank', 'noopener,noreferrer');
+        setGDocsHelpOpen(true);
+        notify('Google Docs opened in a new tab!');
+      } catch (e) {
+        notify(e instanceof Error ? e.message : 'Could not prepare Google Docs export.', 'error');
+      } finally {
+        setExporting(undefined);
+      }
+      return;
+    }
+
     setExporting(kind);
     try {
       const response = await fetch(`/api/export/${kind}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source, settings, allowFallback }),
+        body: JSON.stringify({ source, settings: customSettings, allowFallback }),
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => ({ message: `Export failed (HTTP ${response.status}).` }));
@@ -185,7 +258,7 @@ function App() {
       const blob = await response.blob();
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `${safeName(settings.title)}.${kind}`;
+      link.download = `${safeName(customSettings.title)}.${kind}`;
       link.click();
       URL.revokeObjectURL(link.href);
       setShowFallback(false);
@@ -195,6 +268,21 @@ function App() {
     } finally {
       setExporting(undefined);
     }
+  }
+
+  function handleConfirmDownloadModal() {
+    if (!downloadModal) return;
+    const finalTitle = downloadModal.title.trim() || 'My-Notes';
+    const updatedSettings: DocumentSettings = {
+      ...settings,
+      title: finalTitle,
+      paper: downloadModal.paper,
+      orientation: downloadModal.orientation,
+    };
+    setSettings(updatedSettings);
+    const kind = downloadModal.kind;
+    setDownloadModal(null);
+    performExport(kind, updatedSettings);
   }
 
   function selectIssue(issue: Diagnostic) {
@@ -226,7 +314,7 @@ function App() {
       const unwrapped = unwrapDocumentSource(source);
       if (unwrapped !== null) {
         setSource(unwrapped);
-        notify('Document fence unwrapped');
+        notify('Markdown code fences cleaned up');
       }
     }
   }
@@ -235,15 +323,20 @@ function App() {
   const charCount = [...source].length;
   const readTime = Math.max(1, Math.ceil(wordCount / 200));
 
-  const issueSummary = useMemo(
-    () =>
-      errors.length
-        ? `${errors.length} issue${errors.length === 1 ? '' : 's'} to review`
-        : warnings.length
-          ? `${warnings.length} note${warnings.length === 1 ? '' : 's'}`
-          : 'Ready to export',
-    [errors.length, warnings.length]
-  );
+  const hasIssues = errors.length > 0 || warnings.length > 0;
+  const statusLabel = useMemo(() => {
+    if (busy) return 'Formatting notes…';
+    if (error) return 'Render error';
+    if (errors.length > 0) return `${errors.length} issue${errors.length === 1 ? '' : 's'} (click to view)`;
+    if (warnings.length > 0) return `${warnings.length} formatting tip${warnings.length === 1 ? '' : 's'} (view)`;
+    return 'Ready to download';
+  }, [busy, error, errors.length, warnings.length]);
+
+  function handleStatusClick() {
+    if (hasIssues) {
+      issuesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -258,20 +351,25 @@ function App() {
           </div>
         </a>
 
-        <div className={`status-pill ${errors.length || error ? 'has-errors' : busy ? 'is-busy' : 'is-ready'}`}>
+        <button
+          type="button"
+          className={`status-pill ${errors.length || error ? 'has-errors' : busy ? 'is-busy' : 'is-ready'} ${hasIssues ? 'is-interactive' : ''}`}
+          onClick={handleStatusClick}
+          title={hasIssues ? 'Click to jump to formatting notes' : 'Notes are valid and ready to export'}
+        >
           <span className="status-dot"></span>
           {busy ? <LoaderCircle className="spin" /> : errors.length || error ? <AlertCircle /> : <Check />}
-          <span>{busy ? 'Rendering notes…' : error ? 'Render error' : issueSummary}</span>
-        </div>
+          <span>{statusLabel}</span>
+        </button>
 
         <div className="header-actions">
           <button
             type="button"
-            className={`ghost-button ${showSettings ? 'is-active' : ''}`}
-            onClick={() => setShowSettings((v) => !v)}
-            aria-expanded={showSettings}
+            className="ghost-button quick-action"
+            onClick={() => startDownloadPrompt('pdf')}
+            disabled={!source || busy}
           >
-            <Settings2 /> <span>Document Settings</span>
+            <FileDown /> <span>Download PDF</span>
           </button>
         </div>
       </header>
@@ -280,7 +378,7 @@ function App() {
         <section className="hero">
           <div className="hero-content">
             <div className="eyebrow">
-              <Sparkles /> Built for AI study notes &amp; papers
+              <Sparkles /> Designed for students, researchers &amp; learners
             </div>
             <h1>
               Your notes,
@@ -288,8 +386,8 @@ function App() {
               <em>beautifully translated.</em>
             </h1>
             <p>
-              Paste Markdown from Gemini, ChatGPT, Claude, or any LLM. Keep every equation, scientific symbol, chemical
-              formula, and detailed list faithfully rendered.
+              Paste Markdown from Gemini, ChatGPT, Claude, or any AI tool. Keep every math formula, chemistry equation,
+              table, and formatted detail clean and readable.
             </p>
 
             <div className="sample-chips" aria-label="Load sample documents">
@@ -299,6 +397,7 @@ function App() {
                 className="sample-chip"
                 onClick={() => {
                   setSource(SCIENCE_SAMPLE);
+                  setSettings((s) => ({ ...s, title: 'Science & Chemistry Notes' }));
                   notify('Loaded Science sample');
                 }}
               >
@@ -309,17 +408,19 @@ function App() {
                 className="sample-chip"
                 onClick={() => {
                   setSource(RASGAP_SAMPLE);
+                  setSettings((s) => ({ ...s, title: 'Cell Biology - RasGAP Pathway' }));
                   notify('Loaded Biology sample');
                 }}
               >
-                🧬 Biology / Pathways
+                🧬 Biology &amp; Pathways
               </button>
               <button
                 type="button"
                 className="sample-chip"
                 onClick={() => {
                   setSource(EDGE_CASE_SAMPLE);
-                  notify('Loaded Math & Notation sample');
+                  setSettings((s) => ({ ...s, title: 'Math & Equations Sheet' }));
+                  notify('Loaded Math sample');
                 }}
               >
                 <Sigma /> Math &amp; Equations
@@ -330,88 +431,137 @@ function App() {
           <div className="flow-card">
             <div className="flow-step">
               <span className="flow-tag">INPUT</span>
-              <strong>Raw AI Markdown</strong>
-              <small>Math, chemistry, markdown tables</small>
+              <strong>Paste AI Notes</strong>
+              <small>Math, chemistry, lists &amp; tables</small>
             </div>
             <div className="flow-arrow">
               <ArrowDown />
             </div>
             <div className="flow-step">
               <span className="flow-tag engine">ENGINE</span>
-              <strong>Faithful Typesetting</strong>
-              <small>KaTeX math &amp; Noto Sans typography</small>
+              <strong>Smart Formatter</strong>
+              <small>Renders formulas &amp; typography cleanly</small>
             </div>
             <div className="flow-arrow">
               <ArrowDown />
             </div>
             <div className="flow-step highlight">
               <span className="flow-tag ready">OUTPUT</span>
-              <strong>PDF &bull; DOCX &bull; TXT</strong>
-              <small>Vector precision &amp; editable prose</small>
+              <strong>PDF &bull; Word &bull; Google Docs</strong>
+              <small>Clean downloads ready to submit or share</small>
             </div>
           </div>
         </section>
 
-        {showSettings && (
-          <section className="settings-card" aria-label="Document settings">
-            <label className="wide">
-              <span>Document title</span>
-              <input value={settings.title} onChange={(e) => setSettings({ ...settings, title: e.target.value })} />
-            </label>
-            <label>
-              <span>Paper Size</span>
-              <select
-                value={settings.paper}
-                onChange={(e) => setSettings({ ...settings, paper: e.target.value as any })}
+        {/* Convenient Document Bar right above the workspace */}
+        <section className="document-bar" aria-label="Document settings and title">
+          <div className="doc-title-wrapper">
+            <FileText className="doc-icon" />
+            <div className="doc-title-input-container">
+              <label htmlFor="doc-title-input" className="sr-only">
+                Document Title
+              </label>
+              <input
+                id="doc-title-input"
+                type="text"
+                className="doc-title-input"
+                value={settings.title}
+                onChange={(e) => setSettings({ ...settings, title: e.target.value })}
+                placeholder="Give your document a title (e.g. Biology Notes)..."
+                title="Click to rename document"
+              />
+            </div>
+          </div>
+
+          <div className="doc-settings-pills">
+            <div className="pill-group" title="Page size for PDF">
+              <button
+                type="button"
+                className={`pill-btn ${settings.paper === 'A4' ? 'active' : ''}`}
+                onClick={() => setSettings({ ...settings, paper: 'A4' })}
               >
-                <option>A4</option>
-                <option>Letter</option>
-              </select>
-              <ChevronDown />
-            </label>
-            <label>
-              <span>Orientation</span>
-              <select
-                value={settings.orientation}
-                onChange={(e) => setSettings({ ...settings, orientation: e.target.value as any })}
+                A4
+              </button>
+              <button
+                type="button"
+                className={`pill-btn ${settings.paper === 'Letter' ? 'active' : ''}`}
+                onClick={() => setSettings({ ...settings, paper: 'Letter' })}
               >
-                <option value="portrait">Portrait</option>
-                <option value="landscape">Landscape</option>
-              </select>
-              <ChevronDown />
-            </label>
-            <label>
-              <span>Base Font Size</span>
-              <input
-                type="number"
-                min="8"
-                max="18"
-                value={settings.fontSize}
-                onChange={(e) => setSettings({ ...settings, fontSize: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              <span>Margins (mm)</span>
-              <input
-                type="number"
-                min="8"
-                max="35"
-                value={settings.margin}
-                onChange={(e) => setSettings({ ...settings, margin: Number(e.target.value) })}
-              />
-            </label>
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={settings.singleDollarMath}
-                onChange={(e) => setSettings({ ...settings, singleDollarMath: e.target.checked })}
-              />
-              <span className="toggle" />
-              <span>Recognize $…$ single-dollar inline math</span>
-            </label>
-            <button className="close-settings" onClick={() => setShowSettings(false)} aria-label="Close settings">
-              <X />
+                Letter
+              </button>
+            </div>
+
+            <div className="pill-group" title="Page orientation">
+              <button
+                type="button"
+                className={`pill-btn ${settings.orientation === 'portrait' ? 'active' : ''}`}
+                onClick={() => setSettings({ ...settings, orientation: 'portrait' })}
+              >
+                Portrait
+              </button>
+              <button
+                type="button"
+                className={`pill-btn ${settings.orientation === 'landscape' ? 'active' : ''}`}
+                onClick={() => setSettings({ ...settings, orientation: 'landscape' })}
+              >
+                Landscape
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className={`pill-btn toggle-pill ${settings.singleDollarMath ? 'active' : ''}`}
+              onClick={() => setSettings({ ...settings, singleDollarMath: !settings.singleDollarMath })}
+              title="Recognize $...$ single-dollar inline math formulas"
+            >
+              <Sigma className="pill-icon" />
+              <span>$ Math: {settings.singleDollarMath ? 'On' : 'Off'}</span>
             </button>
+
+            <button
+              type="button"
+              className={`pill-btn more-settings ${showAdvancedSettings ? 'active' : ''}`}
+              onClick={() => setShowAdvancedSettings((v) => !v)}
+              title="Adjust text size and margins"
+            >
+              <Settings2 className="pill-icon" />
+              <span>{showAdvancedSettings ? 'Close' : 'Margins & Size'}</span>
+            </button>
+          </div>
+        </section>
+
+        {showAdvancedSettings && (
+          <section className="settings-drawer" aria-label="Page margins and text size">
+            <div className="drawer-row">
+              <label>
+                <span>Text size</span>
+                <input
+                  type="number"
+                  min="8"
+                  max="18"
+                  value={settings.fontSize}
+                  onChange={(e) => setSettings({ ...settings, fontSize: Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                <span>Page Margins (mm)</span>
+                <input
+                  type="number"
+                  min="8"
+                  max="35"
+                  value={settings.margin}
+                  onChange={(e) => setSettings({ ...settings, margin: Number(e.target.value) })}
+                />
+              </label>
+              <button
+                type="button"
+                className="close-drawer-btn"
+                onClick={() => setShowAdvancedSettings(false)}
+                aria-label="Close settings"
+              >
+                <X />
+              </button>
+            </div>
           </section>
         )}
 
@@ -420,7 +570,7 @@ function App() {
             <div className="panel-header">
               <div className="panel-title-group">
                 <span className="step">01</span>
-                <h2>Markdown Source</h2>
+                <h2>Markdown Notes</h2>
               </div>
               <div className="panel-tools">
                 <div className="format-bar" aria-label="Formatting helpers">
@@ -454,15 +604,15 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => insertFormatting('> ', '', 'quoted thought')}
-                    title="Blockquote (>)"
+                    onClick={() => insertFormatting('> ', '', 'quoted text')}
+                    title="Quote (>)"
                   >
                     <Quote />
                   </button>
                   <button
                     type="button"
                     onClick={() =>
-                      insertFormatting('| Parameter | Value |\n| :--- | :--- |\n| Setting A | 100 |\n', '', '')
+                      insertFormatting('| Column 1 | Column 2 |\n| :--- | :--- |\n| Item A | Value 1 |\n', '', '')
                     }
                     title="Insert Table"
                   >
@@ -506,7 +656,7 @@ function App() {
               value={source}
               onChange={(e) => setSource(e.target.value)}
               spellCheck={false}
-              placeholder={'Paste your Markdown here…\n\nInline math like $E=mc^2$ or equations render automatically.'}
+              placeholder={'Paste your AI notes here…\n\nFormulas like $E=mc^2$ or chemical equations render instantly.'}
               aria-label="Markdown input"
             />
 
@@ -537,7 +687,7 @@ function App() {
             <div className="panel-header">
               <div className="panel-title-group">
                 <span className="step">02</span>
-                <h2>Live Document Preview</h2>
+                <h2>Live Preview</h2>
               </div>
               <div className="segmented">
                 <button
@@ -584,7 +734,7 @@ function App() {
                 </span>
                 <span className="dot-sep">&bull;</span>
                 <span>
-                  <strong>{result?.stats.equations ?? 0}</strong> equations
+                  <strong>{result?.stats.equations ?? 0}</strong> formulas
                 </span>
               </div>
               <div className="preview-actions">
@@ -607,14 +757,14 @@ function App() {
           </div>
         </section>
 
-        {(result?.diagnostics.length ?? 0) > 0 && (
-          <section className="issues-card">
+        {hasIssues && (
+          <section ref={issuesRef} className="issues-card">
             <div className="issues-heading">
               <div className="issues-title">
                 <Info />
                 <div>
-                  <h2>Source notes &amp; notation checklist</h2>
-                  <p>Your content remains untouched. Review these notes before generating downloads.</p>
+                  <h2>Document formatting check</h2>
+                  <p>Your notes are safe. Review these suggestions before exporting.</p>
                 </div>
               </div>
               <span className="issues-count">{result!.diagnostics.length} items</span>
@@ -646,12 +796,12 @@ function App() {
         <section className="export-card">
           <div className="export-intro">
             <div className="export-badge">
-              <span className="step">03</span> Ready for Distribution
+              <span className="step">03</span> Download or Share
             </div>
-            <h2>Export in Any Format</h2>
+            <h2>Export in Your Preferred Format</h2>
             <p>
-              PDF preserves full visual fidelity and LaTeX equations. DOCX provides editable Word prose. TXT gives you a
-              clean, universal Unicode document.
+              Save clean PDF files for submission and printing, Word documents for offline editing, or send directly
+              to Google Docs.
             </p>
           </div>
 
@@ -660,7 +810,7 @@ function App() {
               type="button"
               className="export-btn primary-export"
               disabled={!source || busy || !!error || !!exporting}
-              onClick={() => exportFile('pdf')}
+              onClick={() => startDownloadPrompt('pdf')}
             >
               <div className="export-icon-box">
                 {exporting === 'pdf' ? <LoaderCircle className="spin" /> : <FileDown />}
@@ -668,9 +818,9 @@ function App() {
               <div className="export-label">
                 <div className="export-top">
                   <b>Download PDF</b>
-                  <span className="format-tag prime">Vector &bull; Print Ready</span>
+                  <span className="format-tag prime">Print Ready</span>
                 </div>
-                <small>Full KaTeX math, chemistry &amp; typography</small>
+                <small>Clean formulas, equations &amp; page layout</small>
               </div>
             </button>
 
@@ -678,17 +828,36 @@ function App() {
               type="button"
               className="export-btn secondary-export"
               disabled={!source || busy || !!exporting}
-              onClick={() => exportFile('docx')}
+              onClick={() => startDownloadPrompt('docx')}
             >
               <div className="export-icon-box">
                 {exporting === 'docx' ? <LoaderCircle className="spin" /> : <Download />}
               </div>
               <div className="export-label">
                 <div className="export-top">
-                  <b>Download DOCX</b>
-                  <span className="format-tag">Word 2007+</span>
+                  <b>Download Word (.docx)</b>
+                  <span className="format-tag">Word</span>
                 </div>
-                <small>Editable document with tables &amp; prose</small>
+                <small>Editable document with tables &amp; text</small>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className="export-btn secondary-export gdocs-btn"
+              disabled={!source || busy || !!exporting}
+              onClick={() => startDownloadPrompt('gdocs')}
+              title="Open directly in Google Docs"
+            >
+              <div className="export-icon-box gdocs-icon">
+                {exporting === 'gdocs' ? <LoaderCircle className="spin" /> : <ExternalLink />}
+              </div>
+              <div className="export-label">
+                <div className="export-top">
+                  <b>Export to Google Docs</b>
+                  <span className="format-tag gdocs-badge">Online</span>
+                </div>
+                <small>Copies formatted notes &amp; opens docs.new</small>
               </div>
             </button>
 
@@ -704,9 +873,9 @@ function App() {
               <div className="export-label">
                 <div className="export-top">
                   <b>Plain Text (.txt)</b>
-                  <span className="format-tag">Unicode</span>
+                  <span className="format-tag">Text</span>
                 </div>
-                <small>Clean unicode text without markup</small>
+                <small>Clean text notes without markdown</small>
               </div>
             </button>
           </div>
@@ -724,8 +893,8 @@ function App() {
               </div>
             </div>
             <p className="footer-desc">
-              A high-precision document synthesizer for AI study notes, mathematical notation, chemical formulas, and
-              clean technical writing.
+              Built for students and educators to turn messy AI study notes into clean, publication-ready documents with
+              accurate math and science formulas.
             </p>
           </div>
 
@@ -743,7 +912,7 @@ function App() {
 
         <div className="footer-bottom">
           <span>&copy; {new Date().getFullYear()} MD2TXT. Designed for clarity &amp; focus.</span>
-          <span className="footer-stats-note">Fast serverless export &bull; Instant local rendering</span>
+          <span className="footer-stats-note">Fast serverless export &bull; Works completely offline in your browser</span>
         </div>
       </footer>
 
@@ -754,6 +923,178 @@ function App() {
         </div>
       )}
 
+      {/* Download Name Prompt Modal */}
+      {downloadModal && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setDownloadModal(null)}>
+          <div
+            className="modal download-prompt-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="download-modal-title"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              className="modal-close"
+              onClick={() => setDownloadModal(null)}
+              aria-label="Close download window"
+            >
+              <X />
+            </button>
+            <div className="modal-header-icon">
+              {downloadModal.kind === 'pdf' ? (
+                <FileDown className="modal-icon-pdf" />
+              ) : downloadModal.kind === 'docx' ? (
+                <Download className="modal-icon-docx" />
+              ) : (
+                <ExternalLink className="modal-icon-gdocs" />
+              )}
+            </div>
+
+            <h2 id="download-modal-title">
+              {downloadModal.kind === 'pdf'
+                ? 'Save as PDF'
+                : downloadModal.kind === 'docx'
+                  ? 'Save as Word Document'
+                  : 'Export to Google Docs'}
+            </h2>
+            <p className="modal-subtitle">
+              {downloadModal.kind === 'gdocs'
+                ? 'Give your document a title. It will be copied to your clipboard and opened in Google Docs.'
+                : 'Choose a filename for your download.'}
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleConfirmDownloadModal();
+              }}
+            >
+              <div className="form-group">
+                <label htmlFor="file-name-input">Document Name</label>
+                <div className="filename-input-box">
+                  <input
+                    id="file-name-input"
+                    type="text"
+                    autoFocus
+                    value={downloadModal.title}
+                    onChange={(e) => setDownloadModal({ ...downloadModal, title: e.target.value })}
+                    placeholder="Enter file name..."
+                  />
+                  <span className="filename-ext">
+                    .{downloadModal.kind === 'pdf' ? 'pdf' : 'docx'}
+                  </span>
+                </div>
+              </div>
+
+              {downloadModal.kind === 'pdf' && (
+                <div className="modal-options-row">
+                  <div className="form-group half">
+                    <label>Paper Size</label>
+                    <select
+                      value={downloadModal.paper}
+                      onChange={(e) =>
+                        setDownloadModal({ ...downloadModal, paper: e.target.value as any })
+                      }
+                    >
+                      <option value="A4">A4 Standard</option>
+                      <option value="Letter">US Letter</option>
+                    </select>
+                  </div>
+                  <div className="form-group half">
+                    <label>Orientation</label>
+                    <select
+                      value={downloadModal.orientation}
+                      onChange={(e) =>
+                        setDownloadModal({ ...downloadModal, orientation: e.target.value as any })
+                      }
+                    >
+                      <option value="portrait">Portrait</option>
+                      <option value="landscape">Landscape</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" onClick={() => setDownloadModal(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-modal-btn">
+                  {downloadModal.kind === 'pdf' ? (
+                    <>
+                      <FileDown className="btn-icon" /> Download PDF
+                    </>
+                  ) : downloadModal.kind === 'docx' ? (
+                    <>
+                      <Download className="btn-icon" /> Download Word Doc
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="btn-icon" /> Open Google Docs
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Google Docs Guide Modal */}
+      {gdocsHelpOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setGDocsHelpOpen(false)}>
+          <div
+            className="modal gdocs-help-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gdocs-title"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setGDocsHelpOpen(false)} aria-label="Close">
+              <X />
+            </button>
+            <div className="gdocs-celebrate">
+              <ExternalLink className="gdocs-big-icon" />
+            </div>
+            <h2 id="gdocs-title">Google Docs is ready!</h2>
+            <p>A new tab has opened with a blank Google Doc.</p>
+
+            <div className="gdocs-instructions">
+              <div className="gdoc-instruction-step">
+                <span className="step-number">1</span>
+                <div>
+                  <strong>Paste directly (Fastest)</strong>
+                  <p>
+                    Click inside the new Google Doc tab and press <kbd>Ctrl</kbd>+<kbd>V</kbd> (or <kbd>⌘</kbd>+<kbd>V</kbd> on Mac). Your formatted notes, tables, and formulas are already copied!
+                  </p>
+                </div>
+              </div>
+
+              <div className="gdoc-instruction-step">
+                <span className="step-number">2</span>
+                <div>
+                  <strong>Or open the downloaded .docx</strong>
+                  <p>
+                    We also saved <code>{safeName(settings.title)}.docx</code> to your downloads. You can upload it to Google Drive to open as a document anytime.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="primary-modal-btn"
+                onClick={() => setGDocsHelpOpen(false)}
+              >
+                Got it, thanks!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback Warning Modal */}
       {showFallback && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setShowFallback(false)}>
           <div
@@ -767,8 +1108,8 @@ function App() {
               <X />
             </button>
             <AlertCircle className="modal-icon" />
-            <h2 id="fallback-title">Some notation needs attention</h2>
-            <p>The standard PDF export is paused so unsupported notation cannot disappear silently.</p>
+            <h2 id="fallback-title">Review formula formatting</h2>
+            <p>Some symbols or equations need attention so they don&apos;t disappear in the final PDF.</p>
             <ul>
               {errors.slice(0, 4).map((item) => (
                 <li key={item.id}>{item.message}</li>
@@ -782,10 +1123,17 @@ function App() {
                   textarea.current?.focus();
                 }}
               >
-                Review source
+                Review notes
               </button>
-              <button type="button" className="danger-secondary" onClick={() => exportFile('pdf', true)}>
-                Export with source fallbacks
+              <button
+                type="button"
+                className="danger-secondary"
+                onClick={() => {
+                  setShowFallback(false);
+                  performExport('pdf', settings, true);
+                }}
+              >
+                Download anyway
               </button>
             </div>
           </div>
