@@ -70707,18 +70707,33 @@ async function withPage(fn) {
 }
 
 // server/docx.ts
-async function equationPng(result) {
-  return withPage(async (page) => {
-    await page.setViewportSize({ width: 1200, height: 500 });
-    await page.setContent(`<style>body{margin:0;padding:8px;background:white;display:inline-block}#eq-wrap{display:inline-block}svg{display:inline-block;height:auto;max-height:400px}</style><div id="eq-wrap">${result.svg}</div>`);
-    return page.locator("#eq-wrap").screenshot({ type: "png" });
-  });
+async function renderEquationImages(math2) {
+  const images = /* @__PURE__ */ new Map();
+  const toRender = Object.values(math2).filter((m) => m.svg && !m.exactText && !m.error);
+  if (toRender.length === 0) return images;
+  try {
+    await withPage(async (page) => {
+      await page.setViewportSize({ width: 1200, height: 4e3 });
+      const divs = toRender.map((m, i) => `<div id="eq-wrap-${i}" style="display:inline-block;padding:4px;background:white;margin:4px">${m.svg}</div>`).join("\n");
+      await page.setContent(`<style>body{margin:0;padding:0;background:white}svg{display:inline-block;height:auto;max-height:400px}</style><div>${divs}</div>`, { waitUntil: "domcontentloaded", timeout: 2e4 });
+      for (let i = 0; i < toRender.length; i++) {
+        const m = toRender[i];
+        const buf = await page.locator(`#eq-wrap-${i}`).screenshot({ type: "png", timeout: 5e3 });
+        images.set(m.tex, buf);
+      }
+    });
+  } catch (err) {
+    console.warn("[export:docx] Equation image rendering fallback to text:", err);
+  }
+  return images;
 }
-async function runs(node2, converted, style = {}) {
+function runs(node2, converted, images, style = {}) {
   if (isMathNode(node2)) {
     const result = converted.math[mathKey(node2)];
-    if (!result || result.error || result.exactText || !result.svg) return [new TextRun({ text: result?.text ?? node2.value, ...style })];
-    const data = await equationPng(result);
+    const data = result ? images.get(result.tex) : void 0;
+    if (!data || !result || result.error || result.exactText) {
+      return [new TextRun({ text: result?.text ?? node2.value, ...style })];
+    }
     const height = Math.max(15, Math.min(80, (result.heightEx ?? 2) * 5));
     const width = Math.max(12, Math.min(560, (result.widthEx ?? 3) * 5));
     return [new ImageRun({ data, type: "png", transformation: { width, height }, altText: { name: "Equation", title: node2.value, description: `LaTeX: ${node2.value}` } })];
@@ -70730,42 +70745,42 @@ async function runs(node2, converted, style = {}) {
   if (node2.type === "image") return [new TextRun({ text: `[Image: ${node2.alt || "Untitled"} \u2014 ${node2.url}]`, italics: true })];
   const next = node2.type === "strong" ? { ...style, bold: true } : node2.type === "emphasis" ? { ...style, italics: true } : style;
   const out = [];
-  for (const child of node2.children ?? []) out.push(...await runs(child, converted, next));
+  for (const child of node2.children ?? []) out.push(...runs(child, converted, images, next));
   return out;
 }
-async function blocks(nodes, converted, listLevel = 0) {
+function blocks(nodes, converted, images, listLevel = 0) {
   const out = [];
   for (const node2 of nodes) {
-    if (node2.type === "heading") out.push(new Paragraph({ heading: { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3, 4: HeadingLevel.HEADING_4 }[node2.depth] ?? HeadingLevel.HEADING_5, children: await runs(node2, converted), keepNext: true }));
-    else if (node2.type === "paragraph") out.push(new Paragraph({ children: await runs(node2, converted), spacing: { after: 120 } }));
+    if (node2.type === "heading") out.push(new Paragraph({ heading: { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3, 4: HeadingLevel.HEADING_4 }[node2.depth] ?? HeadingLevel.HEADING_5, children: runs(node2, converted, images), keepNext: true }));
+    else if (node2.type === "paragraph") out.push(new Paragraph({ children: runs(node2, converted, images), spacing: { after: 120 } }));
     else if (node2.type === "blockquote") {
-      for (const block of await blocks(node2.children, converted, listLevel)) {
-        if (block instanceof Paragraph) block.options = block.options;
+      for (const block of blocks(node2.children, converted, images, listLevel)) {
         out.push(block);
       }
     } else if (node2.type === "list") {
       for (let i = 0; i < node2.children.length; i++) {
         const item = node2.children[i];
         const first = item.children[0];
-        const text8 = first?.type === "paragraph" ? await runs(first, converted) : [];
+        const text8 = first?.type === "paragraph" ? runs(first, converted, images) : [];
         if (item.checked !== null && item.checked !== void 0) text8.unshift(new TextRun(item.checked ? "\u2611 " : "\u2610 "));
         out.push(new Paragraph(node2.ordered ? { children: text8, numbering: { reference: "numbered", level: Math.min(listLevel, 8) } } : { children: text8, bullet: { level: Math.min(listLevel, 8) } }));
-        if (first) out.push(...await blocks(item.children.slice(1), converted, listLevel + 1));
+        if (first) out.push(...blocks(item.children.slice(1), converted, images, listLevel + 1));
       }
     } else if (node2.type === "table") {
       const rows = [];
-      for (let ri = 0; ri < node2.children.length; ri++) rows.push(new TableRow({ tableHeader: ri === 0, children: await Promise.all(node2.children[ri].children.map(async (cell) => new TableCell({ children: [new Paragraph({ children: await runs(cell, converted) })], shading: ri === 0 ? { type: ShadingType.CLEAR, fill: "F1F4F8" } : void 0 }))) }));
+      for (let ri = 0; ri < node2.children.length; ri++) rows.push(new TableRow({ tableHeader: ri === 0, children: node2.children[ri].children.map((cell) => new TableCell({ children: [new Paragraph({ children: runs(cell, converted, images) })], shading: ri === 0 ? { type: ShadingType.CLEAR, fill: "F1F4F8" } : void 0 })) }));
       out.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, bottom: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, left: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, right: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" } } }));
-    } else if (node2.type === "code") out.push(new Paragraph({ children: isMathNode(node2) ? await runs(node2, converted) : [new TextRun({ text: node2.value, font: "Courier New" })], shading: { type: ShadingType.CLEAR, fill: "F3F5F7" } }));
-    else if (node2.type === "math") out.push(new Paragraph({ children: await runs(node2, converted), alignment: AlignmentType.CENTER }));
+    } else if (node2.type === "code") out.push(new Paragraph({ children: isMathNode(node2) ? runs(node2, converted, images) : [new TextRun({ text: node2.value, font: "Courier New" })], shading: { type: ShadingType.CLEAR, fill: "F3F5F7" } }));
+    else if (node2.type === "math") out.push(new Paragraph({ children: runs(node2, converted, images), alignment: AlignmentType.CENTER }));
     else if (node2.type === "thematicBreak") out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: "D9DEE8", size: 2 } } }));
-    else if (node2.type === "footnoteDefinition") out.push(new Paragraph({ children: [new TextRun({ text: `[${node2.identifier}] `, bold: true }), ...await runs(node2, converted)] }));
+    else if (node2.type === "footnoteDefinition") out.push(new Paragraph({ children: [new TextRun({ text: `[${node2.identifier}] `, bold: true }), ...runs(node2, converted, images)] }));
   }
   return out;
 }
 async function exportDocx(source, settings) {
   const converted = await convertDocument(source, settings);
-  const children2 = [new Paragraph({ children: [new TextRun({ text: settings.title, bold: true, color: "667085", size: 18 })], border: { bottom: { style: BorderStyle.SINGLE, color: "DFE3EB", size: 2 } }, spacing: { after: 280 } }), ...await blocks(converted.tree.children, converted)];
+  const images = await renderEquationImages(converted.math);
+  const children2 = [new Paragraph({ children: [new TextRun({ text: settings.title, bold: true, color: "667085", size: 18 })], border: { bottom: { style: BorderStyle.SINGLE, color: "DFE3EB", size: 2 } }, spacing: { after: 280 } }), ...blocks(converted.tree.children, converted, images)];
   const [width, height] = paperDimensions(settings);
   const section = { properties: { page: { size: { width: Math.round(width * 56.6929), height: Math.round(height * 56.6929), orientation: settings.orientation === "landscape" ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT }, margin: { top: Math.round(settings.margin * 56.6929), right: Math.round(settings.margin * 56.6929), bottom: Math.round(settings.margin * 56.6929), left: Math.round(settings.margin * 56.6929) } } }, children: children2 };
   const doc = new File({ numbering: { config: [{ reference: "numbered", levels: Array.from({ length: 9 }, (_, level) => ({ level, format: LevelFormat.DECIMAL, text: `%${level + 1}.`, alignment: AlignmentType.START, style: { paragraph: { indent: { left: 720 + level * 360, hanging: 360 } } } })) }] }, styles: { default: { document: { run: { font: "Arial", size: settings.fontSize * 2, color: "172033" }, paragraph: { spacing: { line: 330 } } } } }, sections: [section] });
