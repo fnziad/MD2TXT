@@ -6,6 +6,7 @@
     }
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index" }
+    { "source": "/api/export/pdf", "destination": "/api/export/pdf" },
+    { "source": "/api/export/docx", "destination": "/api/export/docx" }
   ]
 }
