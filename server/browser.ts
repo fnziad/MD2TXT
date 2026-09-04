@@ -1,18 +1,19 @@
 import { chromium, type Browser, type Page } from 'playwright';
-import sparticuzChromium from '@sparticuz/chromium';
+import * as sparticuzChromium from '@sparticuz/chromium';
 
 let browserPromise: Promise<Browser> | undefined;
 
 export function getBrowser() {
   browserPromise ??= (async () => {
     const isVercel = Boolean(process.env.VERCEL);
+    const chromiumRuntime = ((sparticuzChromium as any).default ?? sparticuzChromium) as { executablePath: () => Promise<string>; args: string[] };
     const executablePath = process.env.CHROME_PATH || (isVercel
-      ? await sparticuzChromium.executablePath()
+      ? await chromiumRuntime.executablePath()
       : process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined);
     return chromium.launch({
       headless: true,
       executablePath,
-      args: isVercel ? sparticuzChromium.args : ['--disable-dev-shm-usage', '--font-render-hinting=none'],
+      args: isVercel ? chromiumRuntime.args : ['--disable-dev-shm-usage', '--font-render-hinting=none'],
     });
   })().catch((error) => {
     browserPromise = undefined;
