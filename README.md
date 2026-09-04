@@ -66,6 +66,8 @@ docker build -t md2txt .
 docker run --rm -p 4173:4173 md2txt
 ```
 
+Vercel: import the repository as a Vercel project and keep the default Vite build settings (`npm run build`, output directory `dist`). The included `api/index.ts` exposes the PDF and DOCX endpoints as a serverless function. Set the project’s Node.js runtime to 24 if your account offers it. For the most predictable Chromium behavior and larger documents, deploy the included Docker image to a container host; Vercel serverless functions have execution-time and bundled-browser limits.
+
 ## Verification
 
 ```bash

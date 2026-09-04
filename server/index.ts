@@ -57,8 +57,14 @@ if (process.env.NODE_ENV === 'production') {
   app.use(vite.middlewares);
 }
 
-const port = Number(process.env.PORT) || 4173;
-const server = app.listen(port, '127.0.0.1', () => console.log(`MD2TXT ready at http://127.0.0.1:${port}`));
-const shutdown = async () => { server.close(); await closeBrowser(); process.exit(0); };
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+export default app;
+
+// Vercel imports this module as a serverless handler. Local and Docker runs
+// still start the normal long-lived HTTP server.
+if (!process.env.VERCEL) {
+  const port = Number(process.env.PORT) || 4173;
+  const server = app.listen(port, '127.0.0.1', () => console.log(`MD2TXT ready at http://127.0.0.1:${port}`));
+  const shutdown = async () => { server.close(); await closeBrowser(); process.exit(0); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}

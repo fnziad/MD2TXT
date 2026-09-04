@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 60,
+      "memory": 2048
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" }
+  ]
+}
