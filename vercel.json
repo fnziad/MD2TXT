@@ -1,12 +1,10 @@
 {
   "functions": {
-    "api/index.ts": {
+    "api/**/*.ts": {
       "maxDuration": 60,
-      "memory": 2048
+      "memory": 2048,
+      "includeFiles": "node_modules/@fontsource/**"
     }
-  },
-  "rewrites": [
-    { "source": "/api/export/pdf", "destination": "/api/export/pdf" },
-    { "source": "/api/export/docx", "destination": "/api/export/docx" }
-  ]
+  }
 }
+

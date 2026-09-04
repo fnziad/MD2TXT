@@ -3,18 +3,30 @@ import { createRequire } from 'node:module';
 import { escapeHtml, paperDimensions, type ConvertedDocument, type DocumentSettings } from '../src/core/types';
 
 const require = createRequire(import.meta.url);
+const FONT_DEFS = [
+  { family: 'NotoSans', path: '@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff2', weight: '400', style: 'normal' },
+  { family: 'NotoSans', path: '@fontsource/noto-sans/files/noto-sans-latin-700-normal.woff2', weight: '700', style: 'normal' },
+  { family: 'NotoSans', path: '@fontsource/noto-sans/files/noto-sans-latin-400-italic.woff2', weight: '400', style: 'italic' },
+  { family: 'NotoBengali', path: '@fontsource/noto-sans-bengali/files/noto-sans-bengali-bengali-400-normal.woff2', weight: '400', style: 'normal' },
+  { family: 'NotoSymbols', path: '@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2', weight: '400', style: 'normal' },
+] as const;
+
 let fontsPromise: Promise<string> | undefined;
-async function fonts() {
-  fontsPromise ??= Promise.all([
-    ['NotoSans', '@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff2', '400', 'normal'],
-    ['NotoSans', '@fontsource/noto-sans/files/noto-sans-latin-700-normal.woff2', '700', 'normal'],
-    ['NotoSans', '@fontsource/noto-sans/files/noto-sans-latin-400-italic.woff2', '400', 'italic'],
-    ['NotoBengali', '@fontsource/noto-sans-bengali/files/noto-sans-bengali-bengali-400-normal.woff2', '400', 'normal'],
-    ['NotoSymbols', '@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2', '400', 'normal'],
-  ].map(async ([family, path, weight, style]) => {
-    const data = await readFile(require.resolve(path));
-    return `@font-face{font-family:${family};src:url(data:font/woff2;base64,${data.toString('base64')}) format('woff2');font-weight:${weight};font-style:${style}}`;
-  })).then((rules) => rules.join('\n'));
+async function fonts(): Promise<string> {
+  if (fontsPromise) return fontsPromise;
+  fontsPromise = (async () => {
+    const rules: string[] = [];
+    for (const def of FONT_DEFS) {
+      try {
+        const resolved = require.resolve(def.path);
+        const data = await readFile(resolved);
+        rules.push(`@font-face{font-family:${def.family};src:url(data:font/woff2;base64,${data.toString('base64')}) format('woff2');font-weight:${def.weight};font-style:${def.style}}`);
+      } catch (err) {
+        console.warn(`[fonts] Could not load embedded font ${def.path}:`, err instanceof Error ? err.message : err);
+      }
+    }
+    return rules.join('\n');
+  })().catch(() => '');
   return fontsPromise;
 }
 

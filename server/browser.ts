@@ -1,19 +1,33 @@
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright-core';
 import * as sparticuzChromium from '@sparticuz/chromium';
 
 let browserPromise: Promise<Browser> | undefined;
 
 export function getBrowser() {
   browserPromise ??= (async () => {
-    const isVercel = Boolean(process.env.VERCEL);
-    const chromiumRuntime = ((sparticuzChromium as any).default ?? sparticuzChromium) as { executablePath: () => Promise<string>; args: string[] };
-    const executablePath = process.env.CHROME_PATH || (isVercel
-      ? await chromiumRuntime.executablePath()
-      : process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined);
+    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    const chromiumRuntime = ((sparticuzChromium as any).default ?? sparticuzChromium) as {
+      executablePath: (input?: string) => Promise<string>;
+      args: string[];
+      setGraphicsMode?: boolean;
+    };
+
+    let executablePath = process.env.CHROME_PATH;
+    if (!executablePath && isServerless) {
+      if ('setGraphicsMode' in chromiumRuntime) {
+        chromiumRuntime.setGraphicsMode = false;
+      }
+      const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+      const packUrl = process.env.CHROMIUM_PACK_URL || `https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.${arch}.tar`;
+      executablePath = await chromiumRuntime.executablePath(packUrl);
+    } else if (!executablePath && process.platform === 'darwin') {
+      executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    }
+
     return chromium.launch({
       headless: true,
       executablePath,
-      args: isVercel ? chromiumRuntime.args : ['--disable-dev-shm-usage', '--font-render-hinting=none'],
+      args: isServerless ? chromiumRuntime.args : ['--disable-dev-shm-usage', '--font-render-hinting=none'],
     });
   })().catch((error) => {
     browserPromise = undefined;
@@ -24,15 +38,25 @@ export function getBrowser() {
 
 export async function withPage<T>(fn: (page: Page) => Promise<T>) {
   const browser = await getBrowser();
-  const context = await browser.newContext({ javaScriptEnabled: false, deviceScaleFactor: 3 });
+  let context;
+  try {
+    context = await browser.newContext({ javaScriptEnabled: false, deviceScaleFactor: 3 });
+  } catch (error) {
+    browserPromise = undefined;
+    throw error;
+  }
   const page = await context.newPage();
   await page.route('**/*', (route) => route.request().url().startsWith('data:') ? route.continue() : route.abort());
-  try { return await fn(page); }
-  finally { await context.close(); }
+  try {
+    return await fn(page);
+  } finally {
+    await context.close().catch(() => {});
+  }
 }
 
 export async function closeBrowser() {
   const browser = await browserPromise?.catch(() => undefined);
-  await browser?.close();
+  await browser?.close().catch(() => {});
   browserPromise = undefined;
 }
+

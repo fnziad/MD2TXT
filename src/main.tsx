@@ -96,7 +96,7 @@ function App() {
     try {
       const response = await fetch(`/api/export/${kind}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source, settings, allowFallback }) });
       if (!response.ok) {
-        const problem = await response.json().catch(() => ({ message: 'Export failed.' }));
+        const problem = await response.json().catch(() => ({ message: `Export failed (HTTP ${response.status}).` }));
         if (response.status === 422) { setShowFallback(true); notify('Resolve the highlighted issues or use source fallbacks.', 'error'); return; }
         throw new Error(problem.message || `Export failed (HTTP ${response.status}).`);
       }

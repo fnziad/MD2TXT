@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import { DEFAULT_SETTINGS, LIMITS, type DocumentSettings } from '../src/core/types';
 import { exportPdf, ExportBlocked } from './pdf';
 import { exportDocx } from './docx';
@@ -49,12 +48,15 @@ function exportError(error: unknown, res: express.Response) {
   res.status(status).json({ message });
 }
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(resolve('dist'), { index: false }));
-  app.get('*path', (_req, res) => res.sendFile(resolve('dist/index.html')));
-} else {
-  const vite = await createViteServer({ server: { middlewareMode: true, hmr: false }, appType: 'spa' });
-  app.use(vite.middlewares);
+if (!process.env.VERCEL) {
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(resolve('dist'), { index: false }));
+    app.get('*path', (_req, res) => res.sendFile(resolve('dist/index.html')));
+  } else {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({ server: { middlewareMode: true, hmr: false }, appType: 'spa' });
+    app.use(vite.middlewares);
+  }
 }
 
 export default app;
