@@ -70727,16 +70727,25 @@ async function renderEquationImages(math2) {
   }
   return images;
 }
-function runs(node2, converted, images, style = {}) {
+function runs(node2, converted, images, style = {}, isDisplayMath = false) {
   if (isMathNode(node2)) {
     const result = converted.math[mathKey(node2)];
     const data = result ? images.get(result.tex) : void 0;
     if (!data || !result || result.error || result.exactText) {
       return [new TextRun({ text: result?.text ?? node2.value, ...style })];
     }
-    const height = Math.max(15, Math.min(80, (result.heightEx ?? 2) * 5));
-    const width = Math.max(12, Math.min(560, (result.widthEx ?? 3) * 5));
-    return [new ImageRun({ data, type: "png", transformation: { width, height }, altText: { name: "Equation", title: node2.value, description: `LaTeX: ${node2.value}` } })];
+    const isDisplay = isDisplayMath || node2.type === "math";
+    const scale = isDisplay ? 11 : 8;
+    const height = Math.round(Math.max(16, Math.min(260, (result.heightEx ?? 2) * scale)));
+    const width = Math.round(Math.max(14, Math.min(560, (result.widthEx ?? 3) * scale)));
+    return [
+      new ImageRun({
+        data,
+        type: "png",
+        transformation: { width, height },
+        altText: { name: "Equation", title: node2.value, description: `LaTeX: ${node2.value}` }
+      })
+    ];
   }
   if (node2.type === "text") return [new TextRun({ text: node2.value, ...style })];
   if (node2.type === "inlineCode") return [new TextRun({ text: node2.value, font: "Courier New", shading: { type: ShadingType.CLEAR, fill: "EEF1F5" }, ...style })];
@@ -70745,16 +70754,23 @@ function runs(node2, converted, images, style = {}) {
   if (node2.type === "image") return [new TextRun({ text: `[Image: ${node2.alt || "Untitled"} \u2014 ${node2.url}]`, italics: true })];
   const next = node2.type === "strong" ? { ...style, bold: true } : node2.type === "emphasis" ? { ...style, italics: true } : style;
   const out = [];
-  for (const child of node2.children ?? []) out.push(...runs(child, converted, images, next));
+  for (const child of node2.children ?? []) out.push(...runs(child, converted, images, next, isDisplayMath));
   return out;
 }
-function blocks(nodes, converted, images, listLevel = 0) {
+function extractCellText(cell) {
+  if (!cell) return "";
+  if (cell.type === "text") return cell.value || "";
+  if (isMathNode(cell)) return cell.value || "";
+  if (cell.children) return cell.children.map(extractCellText).join("");
+  return "";
+}
+function blocks(nodes, converted, images, listLevel = 0, availableWidthDxa = 9638) {
   const out = [];
   for (const node2 of nodes) {
     if (node2.type === "heading") out.push(new Paragraph({ heading: { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3, 4: HeadingLevel.HEADING_4 }[node2.depth] ?? HeadingLevel.HEADING_5, children: runs(node2, converted, images), keepNext: true }));
     else if (node2.type === "paragraph") out.push(new Paragraph({ children: runs(node2, converted, images), spacing: { after: 120 } }));
     else if (node2.type === "blockquote") {
-      for (const block of blocks(node2.children, converted, images, listLevel)) {
+      for (const block of blocks(node2.children, converted, images, listLevel, availableWidthDxa)) {
         out.push(block);
       }
     } else if (node2.type === "list") {
@@ -70764,15 +70780,72 @@ function blocks(nodes, converted, images, listLevel = 0) {
         const text8 = first?.type === "paragraph" ? runs(first, converted, images) : [];
         if (item.checked !== null && item.checked !== void 0) text8.unshift(new TextRun(item.checked ? "\u2611 " : "\u2610 "));
         out.push(new Paragraph(node2.ordered ? { children: text8, numbering: { reference: "numbered", level: Math.min(listLevel, 8) } } : { children: text8, bullet: { level: Math.min(listLevel, 8) } }));
-        if (first) out.push(...blocks(item.children.slice(1), converted, images, listLevel + 1));
+        if (first) out.push(...blocks(item.children.slice(1), converted, images, listLevel + 1, availableWidthDxa));
       }
     } else if (node2.type === "table") {
+      const numCols = Math.max(...node2.children.map((r) => r.children.length), 1);
+      const colMaxChars = Array(numCols).fill(1);
+      for (const row of node2.children) {
+        for (let c = 0; c < row.children.length; c++) {
+          const text8 = extractCellText(row.children[c]);
+          colMaxChars[c] = Math.max(colMaxChars[c], text8.length);
+        }
+      }
+      const minColFraction = numCols === 2 ? 0.28 : Math.min(0.2, 1 / (numCols * 2));
+      const totalChars = colMaxChars.reduce((sum2, len) => sum2 + Math.max(len, 6), 0);
+      const rawWeights = colMaxChars.map((len) => Math.max(len, 6) / totalChars);
+      const clampedWeights = rawWeights.map((w) => Math.max(w, minColFraction));
+      const totalClamped = clampedWeights.reduce((sum2, w) => sum2 + w, 0);
+      const normalizedWeights = clampedWeights.map((w) => w / totalClamped);
+      const colWidths = normalizedWeights.map((w) => Math.round(availableWidthDxa * w));
+      const currentSum = colWidths.reduce((a, b) => a + b, 0);
+      colWidths[colWidths.length - 1] += availableWidthDxa - currentSum;
+      const alignments = (node2.align ?? []).map(
+        (a) => a === "center" ? AlignmentType.CENTER : a === "right" ? AlignmentType.RIGHT : AlignmentType.LEFT
+      );
       const rows = [];
-      for (let ri = 0; ri < node2.children.length; ri++) rows.push(new TableRow({ tableHeader: ri === 0, children: node2.children[ri].children.map((cell) => new TableCell({ children: [new Paragraph({ children: runs(cell, converted, images) })], shading: ri === 0 ? { type: ShadingType.CLEAR, fill: "F1F4F8" } : void 0 })) }));
-      out.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, bottom: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, left: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, right: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" }, insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "D9DEE8" } } }));
+      for (let ri = 0; ri < node2.children.length; ri++) {
+        const row = node2.children[ri];
+        const cells2 = [];
+        for (let ci = 0; ci < row.children.length; ci++) {
+          const cell = row.children[ci];
+          const align = alignments[ci] ?? AlignmentType.LEFT;
+          cells2.push(
+            new TableCell({
+              width: { size: colWidths[ci] ?? Math.round(availableWidthDxa / numCols), type: WidthType.DXA },
+              margins: { top: 120, bottom: 120, left: 160, right: 160 },
+              children: [new Paragraph({ children: runs(cell, converted, images), alignment: align })],
+              shading: ri === 0 ? { type: ShadingType.CLEAR, fill: "F1F4F8" } : void 0
+            })
+          );
+        }
+        rows.push(new TableRow({ tableHeader: ri === 0, children: cells2 }));
+      }
+      out.push(
+        new Table({
+          rows,
+          width: { size: availableWidthDxa, type: WidthType.DXA },
+          columnWidths: colWidths,
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 4, color: "D9DEE8" },
+            bottom: { style: BorderStyle.SINGLE, size: 4, color: "D9DEE8" },
+            left: { style: BorderStyle.SINGLE, size: 4, color: "D9DEE8" },
+            right: { style: BorderStyle.SINGLE, size: 4, color: "D9DEE8" },
+            insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: "E2E6EE" },
+            insideVertical: { style: BorderStyle.SINGLE, size: 4, color: "E2E6EE" }
+          }
+        })
+      );
     } else if (node2.type === "code") out.push(new Paragraph({ children: isMathNode(node2) ? runs(node2, converted, images) : [new TextRun({ text: node2.value, font: "Courier New" })], shading: { type: ShadingType.CLEAR, fill: "F3F5F7" } }));
-    else if (node2.type === "math") out.push(new Paragraph({ children: runs(node2, converted, images), alignment: AlignmentType.CENTER }));
-    else if (node2.type === "thematicBreak") out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: "D9DEE8", size: 2 } } }));
+    else if (node2.type === "math") {
+      out.push(
+        new Paragraph({
+          children: runs(node2, converted, images, {}, true),
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 180, after: 180 }
+        })
+      );
+    } else if (node2.type === "thematicBreak") out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: "D9DEE8", size: 2 } } }));
     else if (node2.type === "footnoteDefinition") out.push(new Paragraph({ children: [new TextRun({ text: `[${node2.identifier}] `, bold: true }), ...runs(node2, converted, images)] }));
   }
   return out;
@@ -70780,10 +70853,55 @@ function blocks(nodes, converted, images, listLevel = 0) {
 async function exportDocx(source, settings) {
   const converted = await convertDocument(source, settings);
   const images = await renderEquationImages(converted.math);
-  const children2 = [new Paragraph({ children: [new TextRun({ text: settings.title, bold: true, color: "667085", size: 18 })], border: { bottom: { style: BorderStyle.SINGLE, color: "DFE3EB", size: 2 } }, spacing: { after: 280 } }), ...blocks(converted.tree.children, converted, images)];
   const [width, height] = paperDimensions(settings);
-  const section = { properties: { page: { size: { width: Math.round(width * 56.6929), height: Math.round(height * 56.6929), orientation: settings.orientation === "landscape" ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT }, margin: { top: Math.round(settings.margin * 56.6929), right: Math.round(settings.margin * 56.6929), bottom: Math.round(settings.margin * 56.6929), left: Math.round(settings.margin * 56.6929) } } }, children: children2 };
-  const doc = new File({ numbering: { config: [{ reference: "numbered", levels: Array.from({ length: 9 }, (_, level) => ({ level, format: LevelFormat.DECIMAL, text: `%${level + 1}.`, alignment: AlignmentType.START, style: { paragraph: { indent: { left: 720 + level * 360, hanging: 360 } } } })) }] }, styles: { default: { document: { run: { font: "Arial", size: settings.fontSize * 2, color: "172033" }, paragraph: { spacing: { line: 330 } } } } }, sections: [section] });
+  const marginDxa = Math.round(settings.margin * 56.6929);
+  const availableWidthDxa = Math.round((width - settings.margin * 2) * 56.6929);
+  const children2 = [
+    new Paragraph({
+      children: [new TextRun({ text: settings.title, bold: true, color: "667085", size: 18 })],
+      border: { bottom: { style: BorderStyle.SINGLE, color: "DFE3EB", size: 2 } },
+      spacing: { after: 280 }
+    }),
+    ...blocks(converted.tree.children, converted, images, 0, availableWidthDxa)
+  ];
+  const section = {
+    properties: {
+      page: {
+        size: {
+          width: Math.round(width * 56.6929),
+          height: Math.round(height * 56.6929),
+          orientation: settings.orientation === "landscape" ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT
+        },
+        margin: { top: marginDxa, right: marginDxa, bottom: marginDxa, left: marginDxa }
+      }
+    },
+    children: children2
+  };
+  const doc = new File({
+    numbering: {
+      config: [
+        {
+          reference: "numbered",
+          levels: Array.from({ length: 9 }, (_, level) => ({
+            level,
+            format: LevelFormat.DECIMAL,
+            text: `%${level + 1}.`,
+            alignment: AlignmentType.START,
+            style: { paragraph: { indent: { left: 720 + level * 360, hanging: 360 } } }
+          }))
+        }
+      ]
+    },
+    styles: {
+      default: {
+        document: {
+          run: { font: "Arial", size: settings.fontSize * 2, color: "172033" },
+          paragraph: { spacing: { line: 330 } }
+        }
+      }
+    },
+    sections: [section]
+  });
   return { buffer: await Packer.toBuffer(doc), diagnostics: converted.diagnostics };
 }
 

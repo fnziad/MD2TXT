@@ -26,16 +26,31 @@ async function renderEquationImages(math: Record<string, MathResult>): Promise<M
   return images;
 }
 
-function runs(node: any, converted: ConvertedDocument, images: Map<string, Buffer>, style: { bold?: boolean; italics?: boolean } = {}): (TextRun | ImageRun)[] {
+function runs(
+  node: any,
+  converted: ConvertedDocument,
+  images: Map<string, Buffer>,
+  style: { bold?: boolean; italics?: boolean } = {},
+  isDisplayMath = false
+): (TextRun | ImageRun)[] {
   if (isMathNode(node)) {
     const result = converted.math[mathKey(node)];
     const data = result ? images.get(result.tex) : undefined;
     if (!data || !result || result.error || result.exactText) {
       return [new TextRun({ text: result?.text ?? node.value, ...style })];
     }
-    const height = Math.max(15, Math.min(80, (result.heightEx ?? 2) * 5));
-    const width = Math.max(12, Math.min(560, (result.widthEx ?? 3) * 5));
-    return [new ImageRun({ data, type: 'png', transformation: { width, height }, altText: { name: 'Equation', title: node.value, description: `LaTeX: ${node.value}` } })];
+    const isDisplay = isDisplayMath || node.type === 'math';
+    const scale = isDisplay ? 11 : 8;
+    const height = Math.round(Math.max(16, Math.min(260, (result.heightEx ?? 2) * scale)));
+    const width = Math.round(Math.max(14, Math.min(560, (result.widthEx ?? 3) * scale)));
+    return [
+      new ImageRun({
+        data,
+        type: 'png',
+        transformation: { width, height },
+        altText: { name: 'Equation', title: node.value, description: `LaTeX: ${node.value}` },
+      }),
+    ];
   }
   if (node.type === 'text') return [new TextRun({ text: node.value, ...style })];
   if (node.type === 'inlineCode') return [new TextRun({ text: node.value, font: 'Courier New', shading: { type: ShadingType.CLEAR, fill: 'EEF1F5' }, ...style })];
@@ -44,17 +59,31 @@ function runs(node: any, converted: ConvertedDocument, images: Map<string, Buffe
   if (node.type === 'image') return [new TextRun({ text: `[Image: ${node.alt || 'Untitled'} — ${node.url}]`, italics: true })];
   const next = node.type === 'strong' ? { ...style, bold: true } : node.type === 'emphasis' ? { ...style, italics: true } : style;
   const out: (TextRun | ImageRun)[] = [];
-  for (const child of node.children ?? []) out.push(...runs(child, converted, images, next));
+  for (const child of node.children ?? []) out.push(...runs(child, converted, images, next, isDisplayMath));
   return out;
 }
 
-function blocks(nodes: Nodes[], converted: ConvertedDocument, images: Map<string, Buffer>, listLevel = 0): (Paragraph | Table)[] {
+function extractCellText(cell: any): string {
+  if (!cell) return '';
+  if (cell.type === 'text') return cell.value || '';
+  if (isMathNode(cell)) return cell.value || '';
+  if (cell.children) return cell.children.map(extractCellText).join('');
+  return '';
+}
+
+function blocks(
+  nodes: Nodes[],
+  converted: ConvertedDocument,
+  images: Map<string, Buffer>,
+  listLevel = 0,
+  availableWidthDxa = 9638
+): (Paragraph | Table)[] {
   const out: (Paragraph | Table)[] = [];
   for (const node of nodes as any[]) {
     if (node.type === 'heading') out.push(new Paragraph({ heading: ({ 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3, 4: HeadingLevel.HEADING_4 } as any)[node.depth] ?? HeadingLevel.HEADING_5, children: runs(node, converted, images), keepNext: true }));
     else if (node.type === 'paragraph') out.push(new Paragraph({ children: runs(node, converted, images), spacing: { after: 120 } }));
     else if (node.type === 'blockquote') {
-      for (const block of blocks(node.children, converted, images, listLevel)) {
+      for (const block of blocks(node.children, converted, images, listLevel, availableWidthDxa)) {
         out.push(block);
       }
     } else if (node.type === 'list') {
@@ -64,14 +93,77 @@ function blocks(nodes: Nodes[], converted: ConvertedDocument, images: Map<string
         const text = first?.type === 'paragraph' ? runs(first, converted, images) : [];
         if (item.checked !== null && item.checked !== undefined) text.unshift(new TextRun(item.checked ? '☑ ' : '☐ '));
         out.push(new Paragraph(node.ordered ? { children: text, numbering: { reference: 'numbered', level: Math.min(listLevel, 8) } } : { children: text, bullet: { level: Math.min(listLevel, 8) } }));
-        if (first) out.push(...blocks(item.children.slice(1), converted, images, listLevel + 1));
+        if (first) out.push(...blocks(item.children.slice(1), converted, images, listLevel + 1, availableWidthDxa));
       }
     } else if (node.type === 'table') {
+      const numCols = Math.max(...node.children.map((r: any) => r.children.length), 1);
+      const colMaxChars = Array(numCols).fill(1);
+      for (const row of node.children) {
+        for (let c = 0; c < row.children.length; c++) {
+          const text = extractCellText(row.children[c]);
+          colMaxChars[c] = Math.max(colMaxChars[c], text.length);
+        }
+      }
+
+      const minColFraction = numCols === 2 ? 0.28 : Math.min(0.20, 1 / (numCols * 2));
+      const totalChars = colMaxChars.reduce((sum: number, len: number) => sum + Math.max(len, 6), 0);
+      const rawWeights = colMaxChars.map((len: number) => Math.max(len, 6) / totalChars);
+      const clampedWeights = rawWeights.map((w: number) => Math.max(w, minColFraction));
+      const totalClamped = clampedWeights.reduce((sum: number, w: number) => sum + w, 0);
+      const normalizedWeights = clampedWeights.map((w: number) => w / totalClamped);
+
+      const colWidths = normalizedWeights.map((w: number) => Math.round(availableWidthDxa * w));
+      const currentSum = colWidths.reduce((a: number, b: number) => a + b, 0);
+      colWidths[colWidths.length - 1] += availableWidthDxa - currentSum;
+
+      const alignments = (node.align ?? []).map((a: string | null) =>
+        a === 'center' ? AlignmentType.CENTER : a === 'right' ? AlignmentType.RIGHT : AlignmentType.LEFT
+      );
+
       const rows: TableRow[] = [];
-      for (let ri = 0; ri < node.children.length; ri++) rows.push(new TableRow({ tableHeader: ri === 0, children: node.children[ri].children.map((cell: any) => new TableCell({ children: [new Paragraph({ children: runs(cell, converted, images) })], shading: ri === 0 ? { type: ShadingType.CLEAR, fill: 'F1F4F8' } : undefined })) }));
-      out.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.SINGLE, size: 1, color: 'D9DEE8' }, bottom: { style: BorderStyle.SINGLE, size: 1, color: 'D9DEE8' }, left: { style: BorderStyle.SINGLE, size: 1, color: 'D9DEE8' }, right: { style: BorderStyle.SINGLE, size: 1, color: 'D9DEE8' }, insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'D9DEE8' }, insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'D9DEE8' } } }));
+      for (let ri = 0; ri < node.children.length; ri++) {
+        const row = node.children[ri];
+        const cells: TableCell[] = [];
+        for (let ci = 0; ci < row.children.length; ci++) {
+          const cell = row.children[ci];
+          const align = alignments[ci] ?? AlignmentType.LEFT;
+          cells.push(
+            new TableCell({
+              width: { size: colWidths[ci] ?? Math.round(availableWidthDxa / numCols), type: WidthType.DXA },
+              margins: { top: 120, bottom: 120, left: 160, right: 160 },
+              children: [new Paragraph({ children: runs(cell, converted, images), alignment: align })],
+              shading: ri === 0 ? { type: ShadingType.CLEAR, fill: 'F1F4F8' } : undefined,
+            })
+          );
+        }
+        rows.push(new TableRow({ tableHeader: ri === 0, children: cells }));
+      }
+
+      out.push(
+        new Table({
+          rows,
+          width: { size: availableWidthDxa, type: WidthType.DXA },
+          columnWidths: colWidths,
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 4, color: 'D9DEE8' },
+            bottom: { style: BorderStyle.SINGLE, size: 4, color: 'D9DEE8' },
+            left: { style: BorderStyle.SINGLE, size: 4, color: 'D9DEE8' },
+            right: { style: BorderStyle.SINGLE, size: 4, color: 'D9DEE8' },
+            insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: 'E2E6EE' },
+            insideVertical: { style: BorderStyle.SINGLE, size: 4, color: 'E2E6EE' },
+          },
+        })
+      );
     } else if (node.type === 'code') out.push(new Paragraph({ children: isMathNode(node) ? runs(node, converted, images) : [new TextRun({ text: node.value, font: 'Courier New' })], shading: { type: ShadingType.CLEAR, fill: 'F3F5F7' } }));
-    else if (node.type === 'math') out.push(new Paragraph({ children: runs(node, converted, images), alignment: AlignmentType.CENTER }));
+    else if (node.type === 'math') {
+      out.push(
+        new Paragraph({
+          children: runs(node, converted, images, {}, true),
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 180, after: 180 },
+        })
+      );
+    }
     else if (node.type === 'thematicBreak') out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: 'D9DEE8', size: 2 } } }));
     else if (node.type === 'footnoteDefinition') out.push(new Paragraph({ children: [new TextRun({ text: `[${node.identifier}] `, bold: true }), ...runs(node, converted, images)] }));
   }
@@ -81,9 +173,55 @@ function blocks(nodes: Nodes[], converted: ConvertedDocument, images: Map<string
 export async function exportDocx(source: string, settings: DocumentSettings) {
   const converted = await convertDocument(source, settings);
   const images = await renderEquationImages(converted.math);
-  const children = [new Paragraph({ children: [new TextRun({ text: settings.title, bold: true, color: '667085', size: 18 })], border: { bottom: { style: BorderStyle.SINGLE, color: 'DFE3EB', size: 2 } }, spacing: { after: 280 } }), ...blocks(converted.tree.children, converted, images)];
   const [width, height] = paperDimensions(settings);
-  const section: ISectionOptions = { properties: { page: { size: { width: Math.round(width * 56.6929), height: Math.round(height * 56.6929), orientation: settings.orientation === 'landscape' ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT }, margin: { top: Math.round(settings.margin * 56.6929), right: Math.round(settings.margin * 56.6929), bottom: Math.round(settings.margin * 56.6929), left: Math.round(settings.margin * 56.6929) } } }, children };
-  const doc = new Document({ numbering: { config: [{ reference: 'numbered', levels: Array.from({ length: 9 }, (_, level) => ({ level, format: LevelFormat.DECIMAL, text: `%${level + 1}.`, alignment: AlignmentType.START, style: { paragraph: { indent: { left: 720 + level * 360, hanging: 360 } } } })) }] }, styles: { default: { document: { run: { font: 'Arial', size: settings.fontSize * 2, color: '172033' }, paragraph: { spacing: { line: 330 } } } } }, sections: [section] });
+  const marginDxa = Math.round(settings.margin * 56.6929);
+  const availableWidthDxa = Math.round((width - settings.margin * 2) * 56.6929);
+
+  const children = [
+    new Paragraph({
+      children: [new TextRun({ text: settings.title, bold: true, color: '667085', size: 18 })],
+      border: { bottom: { style: BorderStyle.SINGLE, color: 'DFE3EB', size: 2 } },
+      spacing: { after: 280 },
+    }),
+    ...blocks(converted.tree.children, converted, images, 0, availableWidthDxa),
+  ];
+  const section: ISectionOptions = {
+    properties: {
+      page: {
+        size: {
+          width: Math.round(width * 56.6929),
+          height: Math.round(height * 56.6929),
+          orientation: settings.orientation === 'landscape' ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT,
+        },
+        margin: { top: marginDxa, right: marginDxa, bottom: marginDxa, left: marginDxa },
+      },
+    },
+    children,
+  };
+  const doc = new Document({
+    numbering: {
+      config: [
+        {
+          reference: 'numbered',
+          levels: Array.from({ length: 9 }, (_, level) => ({
+            level,
+            format: LevelFormat.DECIMAL,
+            text: `%${level + 1}.`,
+            alignment: AlignmentType.START,
+            style: { paragraph: { indent: { left: 720 + level * 360, hanging: 360 } } },
+          })),
+        },
+      ],
+    },
+    styles: {
+      default: {
+        document: {
+          run: { font: 'Arial', size: settings.fontSize * 2, color: '172033' },
+          paragraph: { spacing: { line: 330 } },
+        },
+      },
+    },
+    sections: [section],
+  });
   return { buffer: await Packer.toBuffer(doc), diagnostics: converted.diagnostics };
 }
