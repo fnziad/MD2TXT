@@ -3,12 +3,15 @@ import { createRoot } from 'react-dom/client';
 import {
   AlertCircle,
   Check,
+  Columns,
   Download,
   ExternalLink,
+  Eye,
   FileDown,
   FileText,
   FlaskConical,
   LoaderCircle,
+  PenLine,
   RotateCcw,
   Sigma,
   Sliders,
@@ -88,6 +91,7 @@ function App() {
   const [source, setSource] = useState('');
   const [settings, setSettings] = useState<DocumentSettings>({ ...DEFAULT_SETTINGS, title: '' });
   const [outputMode, setOutputMode] = useState<'formatted' | 'plain'>('formatted');
+  const [mobileTab, setMobileTab] = useState<'editor' | 'preview' | 'both'>('editor');
   const [lastCleared, setLastCleared] = useState('');
   const [notice, setNotice] = useState<Notice>();
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
@@ -335,18 +339,18 @@ function App() {
         <div className="max-w-[1440px] mx-auto flex items-center justify-between">
           {/* Logo and App Title */}
           <div className="flex items-center gap-3">
-            <a href="#top" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-900 via-indigo-700 to-indigo-500 flex items-center justify-center shadow-sm text-white overflow-hidden p-0.5">
+            <a href="#top" className="flex items-center gap-2.5 sm:gap-3 group">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-900 via-indigo-700 to-indigo-500 flex items-center justify-center shadow-sm text-white overflow-hidden p-0.5 shrink-0">
                 <img src="/logo.png" alt="MD2TXT" className="w-full h-full object-cover rounded-[10px]" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-900 tracking-tight text-base leading-none">MD2TXT</span>
-                  <span className="text-[10px] font-semibold bg-indigo-50 text-brand-600 px-1.5 py-0.5 rounded tracking-wide border border-indigo-100">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="font-bold text-slate-900 tracking-tight text-sm sm:text-base leading-none">MD2TXT</span>
+                  <span className="text-[9px] sm:text-[10px] font-semibold bg-indigo-50 text-brand-600 px-1.5 py-0.5 rounded tracking-wide border border-indigo-100">
                     BETA
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 leading-tight mt-0.5 font-normal">AI Notes to Beautiful Docs</p>
+                <p className="hidden sm:block text-[11px] text-slate-500 leading-tight mt-0.5 font-normal">AI Notes to Beautiful Docs</p>
               </div>
             </a>
           </div>
@@ -391,15 +395,15 @@ function App() {
           </button>
 
           {/* Right Action Button */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => startDownloadPrompt('pdf')}
               disabled={!source.trim() || busy}
-              className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center gap-1.5 sm:gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white text-xs font-semibold px-3 sm:px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
             >
               <FileDown className="w-4 h-4" />
-              <span>Download PDF</span>
+              <span><span className="hidden sm:inline">Download </span>PDF</span>
             </button>
           </div>
         </div>
@@ -416,20 +420,20 @@ function App() {
               <span>DESIGNED FOR STUDENTS, RESEARCHERS &amp; LEARNERS</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-[58px] tracking-tight font-extrabold text-slate-900 leading-[1.06]">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[56px] tracking-tight font-extrabold text-slate-900 leading-[1.08]">
               Your notes, <br />
               <span className="italic-serif text-brand-500 font-normal tracking-normal text-[1.12em]">
                 beautifully translated.
               </span>
             </h1>
 
-            <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-2xl font-normal">
+            <p className="text-slate-600 text-sm sm:text-base md:text-lg leading-relaxed max-w-2xl font-normal">
               Paste Markdown from Gemini, ChatGPT, Claude, or any AI tool. Keep every math formula, chemistry equation,
               table, and formatted detail clean and readable.
             </p>
 
             {/* Quick Sample Buttons & Clear Option */}
-            <div className="pt-2 flex flex-wrap items-center gap-2.5">
+            <div className="pt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 font-semibold mr-1">Try sample:</span>
               <button
                 type="button"
@@ -438,7 +442,7 @@ function App() {
                   setSettings((s) => ({ ...s, title: 'Science & Chemistry Notes' }));
                   notify('Loaded Science sample');
                 }}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
               >
                 <FlaskConical className="w-3.5 h-3.5 text-indigo-500" />
                 <span>Science &amp; Chem</span>
@@ -451,7 +455,7 @@ function App() {
                   setSettings((s) => ({ ...s, title: 'Cell Biology - RasGAP Pathway' }));
                   notify('Loaded Biology sample');
                 }}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
               >
                 <span>🧬</span>
                 <span>Biology &amp; Pathways</span>
@@ -464,7 +468,7 @@ function App() {
                   setSettings((s) => ({ ...s, title: 'Math & Equations Sheet' }));
                   notify('Loaded Math sample');
                 }}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
               >
                 <Sigma className="w-3.5 h-3.5 text-indigo-500 stroke-[2.5]" />
                 <span>Math &amp; Equations</span>
@@ -499,10 +503,29 @@ function App() {
                 </button>
               ) : null}
             </div>
+
+            {/* Mobile Compact Stepper (< lg) */}
+            <div className="lg:hidden grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-white border border-slate-200/90 shadow-xs text-center mt-3">
+              <div className="flex flex-col items-center py-1">
+                <span className="w-4 h-4 rounded-full bg-slate-100 text-[10px] font-mono flex items-center justify-center font-bold text-slate-600 mb-0.5">1</span>
+                <span className="text-[11px] font-bold text-slate-800">Paste Notes</span>
+                <span className="text-[9px] text-slate-400">AI / Markdown</span>
+              </div>
+              <div className="flex flex-col items-center py-1 border-x border-slate-100 px-1">
+                <span className="w-4 h-4 rounded-full bg-indigo-50 text-[10px] font-mono flex items-center justify-center font-bold text-brand-600 mb-0.5">2</span>
+                <span className="text-[11px] font-bold text-slate-800">Smart Format</span>
+                <span className="text-[9px] text-slate-400">Math &amp; Tables</span>
+              </div>
+              <div className="flex flex-col items-center py-1">
+                <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] font-mono flex items-center justify-center font-bold text-white mb-0.5">3</span>
+                <span className="text-[11px] font-bold text-brand-700">Export Ready</span>
+                <span className="text-[9px] text-slate-400">PDF / Word / Docs</span>
+              </div>
+            </div>
           </div>
 
-          {/* Right Column: Workflow Pipeline Stepper Card */}
-          <div>
+          {/* Right Column: Workflow Pipeline Stepper Card (Desktop Only) */}
+          <div className="hidden lg:block">
             <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-sm space-y-2">
               {/* Step 1: Input */}
               <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100">
@@ -543,13 +566,13 @@ function App() {
         </section>
 
         {/* Document Settings Bar */}
-        <div className="bg-white rounded-xl border border-slate-200 p-2.5 sm:px-4 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="bg-white rounded-xl border border-slate-200 p-2.5 sm:px-4 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 text-xs">
           {/* Document Title Input */}
-          <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <FileText className="w-4 h-4 text-brand-500 shrink-0" />
             <input
               aria-label="Document Title"
-              className="font-semibold text-slate-800 bg-transparent border-0 focus:ring-0 p-0 text-xs sm:text-sm w-full focus:outline-none placeholder-slate-400"
+              className="font-semibold text-slate-800 bg-transparent border-0 focus:ring-0 p-0 text-xs sm:text-sm w-full focus:outline-none placeholder-slate-400 min-w-0"
               type="text"
               value={settings.title}
               onChange={(e) => setSettings({ ...settings, title: e.target.value })}
@@ -558,13 +581,13 @@ function App() {
           </div>
 
           {/* Controls & Format Toggles */}
-          <div className="flex items-center flex-wrap gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 sm:py-0">
             {/* Paper Size Toggle */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium text-slate-600">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium text-slate-600 shrink-0">
               <button
                 type="button"
                 onClick={() => setSettings({ ...settings, paper: 'A4' })}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   settings.paper === 'A4' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
                 }`}
               >
@@ -573,7 +596,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setSettings({ ...settings, paper: 'Letter' })}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   settings.paper === 'Letter' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
                 }`}
               >
@@ -582,11 +605,11 @@ function App() {
             </div>
 
             {/* Orientation Toggle */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium text-slate-600">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium text-slate-600 shrink-0">
               <button
                 type="button"
                 onClick={() => setSettings({ ...settings, orientation: 'portrait' })}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   settings.orientation === 'portrait' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
                 }`}
               >
@@ -595,7 +618,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setSettings({ ...settings, orientation: 'landscape' })}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   settings.orientation === 'landscape' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'hover:text-slate-900'
                 }`}
               >
@@ -607,7 +630,7 @@ function App() {
             <button
               type="button"
               onClick={() => setSettings({ ...settings, singleDollarMath: !settings.singleDollarMath })}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 cursor-pointer ${
                 settings.singleDollarMath
                   ? 'bg-indigo-50 border border-indigo-200/80 text-brand-600 hover:bg-indigo-100'
                   : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -621,14 +644,14 @@ function App() {
             <button
               type="button"
               onClick={() => setShowAdvancedSettings((v) => !v)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-medium border transition-colors shrink-0 cursor-pointer ${
                 showAdvancedSettings
                   ? 'bg-slate-800 text-white border-slate-800'
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
-              <span>{showAdvancedSettings ? 'Close' : 'Margins & Size'}</span>
+              <span>{showAdvancedSettings ? 'Close' : 'Margins'}</span>
             </button>
           </div>
         </div>
@@ -665,7 +688,7 @@ function App() {
             <button
               type="button"
               onClick={() => setShowAdvancedSettings(false)}
-              className="ml-auto p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+              className="ml-auto p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
               aria-label="Close drawer"
             >
               <X className="w-4 h-4" />
@@ -673,13 +696,64 @@ function App() {
           </div>
         )}
 
+        {/* Mobile View Switcher (< lg) */}
+        <div className="lg:hidden flex items-center justify-between p-1 bg-slate-200/80 rounded-xl text-xs font-medium gap-1">
+          <button
+            type="button"
+            onClick={() => setMobileTab('editor')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
+              mobileTab === 'editor'
+                ? 'bg-editor-bg text-white shadow-xs font-semibold'
+                : 'text-slate-700 hover:text-slate-900'
+            }`}
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            <span>Editor</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileTab('preview')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
+              mobileTab === 'preview'
+                ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                : 'text-slate-700 hover:text-slate-900'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5 text-brand-600" />
+            <span>Live Preview</span>
+            {result?.stats.equations ? (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-brand-600 font-bold">
+                {result.stats.equations}∑
+              </span>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileTab('both')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
+              mobileTab === 'both'
+                ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                : 'text-slate-700 hover:text-slate-900'
+            }`}
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span>Split Both</span>
+          </button>
+        </div>
+
         {/* Dual Pane Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-2 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
           {/* LEFT PANE: Editor (Dark Canvas) */}
-          <div className="bg-editor-bg flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800">
+          <div
+            className={`${
+              mobileTab === 'preview' ? 'hidden lg:flex' : 'flex'
+            } bg-editor-bg flex-col border-b lg:border-b-0 lg:border-r border-slate-800`}
+          >
             {/* Left Pane Header & Toolbar */}
-            <div className="bg-editor-toolbar px-4 py-2.5 border-b border-editor-border flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+            <div className="bg-editor-toolbar px-3 sm:px-4 py-2 sm:py-2.5 border-b border-editor-border flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-2 shrink-0">
                 <span className="text-[10px] font-mono font-bold bg-slate-700/60 text-slate-300 px-1.5 py-0.5 rounded">
                   01
                 </span>
@@ -687,7 +761,7 @@ function App() {
               </div>
 
               {/* Markdown Actions Toolbar */}
-              <div className="flex items-center gap-1 text-slate-400">
+              <div className="flex items-center gap-1 text-slate-400 shrink-0">
                 <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-700/60 text-xs">
                   <button
                     type="button"
@@ -799,38 +873,53 @@ function App() {
                 spellCheck={false}
                 placeholder={'Paste your AI notes here…\n\nFormulas like $E=mc^2$ or chemical equations render instantly.'}
                 aria-label="Markdown input"
-                className="w-full flex-1 p-5 font-mono text-[13px] leading-relaxed text-editor-text bg-editor-bg border-0 outline-none resize-none min-h-[420px] focus:ring-0"
+                className="w-full flex-1 p-4 sm:p-5 font-mono text-[13px] leading-relaxed text-editor-text bg-editor-bg border-0 outline-none resize-none min-h-[380px] sm:min-h-[420px] focus:ring-0"
               />
             </div>
 
             {/* Left Pane Footer Bar */}
-            <div className="px-4 py-2 bg-[#121721] border-t border-editor-border text-[11px] text-slate-400 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="px-3 sm:px-4 py-2 bg-[#121721] border-t border-editor-border text-[11px] text-slate-400 flex items-center justify-between">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <span>{charCount.toLocaleString()} chars</span>
                 <span>&bull;</span>
                 <span>{wordCount.toLocaleString()} words</span>
-                <span>&bull;</span>
-                <span>~{readTime} min read</span>
+                <span className="hidden sm:inline">&bull;</span>
+                <span className="hidden sm:inline">~{readTime} min read</span>
               </div>
-              {lastCleared && !source && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSource(lastCleared);
-                    setLastCleared('');
-                  }}
-                  className="inline-flex items-center gap-1 text-indigo-300 hover:text-white"
-                >
-                  <RotateCcw className="w-3 h-3" /> Undo clear
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {lastCleared && !source && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSource(lastCleared);
+                      setLastCleared('');
+                    }}
+                    className="inline-flex items-center gap-1 text-indigo-300 hover:text-white cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Undo clear
+                  </button>
+                )}
+                {mobileTab === 'editor' && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileTab('preview')}
+                    className="lg:hidden inline-flex items-center gap-1 text-indigo-400 font-semibold hover:text-indigo-300 cursor-pointer"
+                  >
+                    <span>Preview</span> &rarr;
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* RIGHT PANE: Live Preview (Crisp White Canvas) */}
-          <div className="bg-white flex flex-col">
+          <div
+            className={`${
+              mobileTab === 'editor' ? 'hidden lg:flex' : 'flex'
+            } bg-white flex-col`}
+          >
             {/* Right Pane Header & Actions */}
-            <div className="bg-slate-50/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+            <div className="bg-slate-50/90 px-3 sm:px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold bg-indigo-100 text-brand-600 px-1.5 py-0.5 rounded">
                   02
@@ -844,7 +933,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => setOutputMode('formatted')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer ${
                       outputMode === 'formatted'
                         ? 'bg-white text-slate-800 shadow-xs font-semibold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -856,7 +945,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => setOutputMode('plain')}
-                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-md transition-all ${
+                    className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer ${
                       outputMode === 'plain'
                         ? 'bg-white text-slate-800 shadow-xs font-semibold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -874,7 +963,7 @@ function App() {
             </div>
 
             {/* Right Pane Content */}
-            <div className={`p-6 sm:p-8 overflow-y-auto max-h-[500px] min-h-[420px] bg-white ${busy ? 'opacity-65' : ''}`}>
+            <div className={`p-4 sm:p-6 md:p-8 overflow-y-auto max-h-[600px] min-h-[380px] sm:min-h-[420px] bg-white ${busy ? 'opacity-65' : ''}`}>
               {error ? (
                 <div className="flex flex-col items-center justify-center text-center p-8 text-slate-500 space-y-2">
                   <AlertCircle className="w-8 h-8 text-rose-500" />
@@ -897,8 +986,17 @@ function App() {
             </div>
 
             {/* Right Pane Footer Bar */}
-            <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="px-3 sm:px-4 py-2 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
+              <div className="flex items-center gap-2 sm:gap-3">
+                {mobileTab === 'preview' && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileTab('editor')}
+                    className="lg:hidden inline-flex items-center gap-1 text-slate-700 font-semibold hover:text-slate-900 cursor-pointer mr-1"
+                  >
+                    &larr; <span>Edit</span>
+                  </button>
+                )}
                 <span>
                   <strong>{wordCount.toLocaleString()}</strong> words
                 </span>
@@ -1119,11 +1217,11 @@ function App() {
       <footer className="mt-auto py-8 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p className="font-semibold text-slate-700">MD2TXT — AI Notes to Beautiful Documents</p>
-          <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-[11px] text-slate-400">
             <span>
               Crafted &amp; Developed by <strong className="text-slate-600 font-semibold">Ziad</strong>
             </span>
-            <span>&bull;</span>
+            <span className="hidden sm:inline">&bull;</span>
             <span>100% Client-side preview privacy &bull; Zero data retention</span>
           </div>
         </div>
@@ -1198,7 +1296,7 @@ function App() {
                     className="flex-1 h-10 px-3 text-sm font-semibold text-slate-800 border-0 outline-none focus:ring-0"
                   />
                   <span className="px-3 text-xs font-bold text-slate-400 bg-slate-100 h-10 flex items-center border-l border-slate-200">
-                    .{downloadModal.kind === 'pdf' ? 'pdf' : 'docx'}
+                    {downloadModal.kind === 'pdf' ? '.pdf' : downloadModal.kind === 'docx' ? '.docx' : 'Docs'}
                   </span>
                 </div>
               </div>
@@ -1234,17 +1332,17 @@ function App() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-2.5 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setDownloadModal(null)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all cursor-pointer"
+                  className="w-full sm:w-auto justify-center inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2.5 sm:py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all cursor-pointer"
                 >
                   {downloadModal.kind === 'pdf' ? (
                     <>
@@ -1313,13 +1411,13 @@ function App() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between flex-wrap gap-2.5 mt-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mt-4">
               <div className="flex items-center gap-2">
                 <a
                   href="https://drive.google.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                   <span>Google Drive</span>
@@ -1328,7 +1426,7 @@ function App() {
                   href="https://docs.new"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                   <span>docs.new</span>
@@ -1336,7 +1434,7 @@ function App() {
               </div>
               <button
                 type="button"
-                className="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer ml-auto"
+                className="w-full sm:w-auto bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2.5 sm:py-2 rounded-lg shadow-sm transition-colors cursor-pointer text-center"
                 onClick={() => setGDocsHelpOpen(false)}
               >
                 Got it, thanks!
