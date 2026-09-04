@@ -51225,9 +51225,9 @@ function linearMath(node2) {
       return `${base}${node2.kind === "mover" ? "^" : "_"}(${b.trim()})${c ? `^(${c.trim()})` : ""}`;
     }
     case "mtable":
-      return `[${values().join("; ")}]`;
+      return values().join("; ");
     case "mtr":
-      return `[${values().join(", ")}]`;
+      return values().join(", ");
     case "mtd":
       return values().join("").trim();
     default:
@@ -51307,9 +51307,9 @@ function mmlToClipboardHtml(node2) {
       return `${base}${node2.kind === "mover" ? `<sup>${b.trim()}</sup>` : `<sub>${b.trim()}</sub>`}${c ? `<sup>${c.trim()}</sup>` : ""}`;
     }
     case "mtable":
-      return `[${values().join("; ")}]`;
+      return values().join("; ");
     case "mtr":
-      return `[${values().join(", ")}]`;
+      return values().join(", ");
     case "mtd":
       return values().join("").trim();
     default:

@@ -42,7 +42,7 @@ function useConversion(source: string, settings: DocumentSettings) {
   const counter = useRef(0);
   const [result, setResult] = useState<ConvertedDocument>();
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(true);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     worker.current = new Worker(new URL('./converter.worker.ts', import.meta.url), { type: 'module' });
@@ -66,6 +66,12 @@ function useConversion(source: string, settings: DocumentSettings) {
   }, []);
 
   useEffect(() => {
+    if (!source.trim()) {
+      setBusy(false);
+      setError('');
+      setResult(undefined);
+      return;
+    }
     const timer = window.setTimeout(() => {
       setBusy(true);
       setError('');
@@ -79,8 +85,8 @@ function useConversion(source: string, settings: DocumentSettings) {
 }
 
 function App() {
-  const [source, setSource] = useState(SCIENCE_SAMPLE);
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [source, setSource] = useState('');
+  const [settings, setSettings] = useState<DocumentSettings>({ ...DEFAULT_SETTINGS, title: '' });
   const [outputMode, setOutputMode] = useState<'formatted' | 'plain'>('formatted');
   const [lastCleared, setLastCleared] = useState('');
   const [notice, setNotice] = useState<Notice>();
@@ -125,7 +131,7 @@ function App() {
       const text = await navigator.clipboard.readText();
       setSource(text);
       const titleFromMarkdown = extractTitleFromMarkdown(text);
-      if (titleFromMarkdown && settings.title === DEFAULT_SETTINGS.title) {
+      if (titleFromMarkdown && (!settings.title || settings.title === DEFAULT_SETTINGS.title)) {
         setSettings((s) => ({ ...s, title: titleFromMarkdown }));
       }
       notify('Pasted from clipboard');
@@ -186,8 +192,8 @@ function App() {
     allowFallback = false
   ) {
     if (kind === 'gdocs') {
-      // Open new tab synchronously in direct user click turn to avoid browser popup blockers
-      const docsTab = window.open('https://docs.new', '_blank');
+      // Open Google Drive synchronously in direct user click turn to avoid browser popup blockers
+      window.open('https://drive.google.com', '_blank');
       setExporting('gdocs');
       try {
         if (result && navigator.clipboard.write && window.ClipboardItem) {
@@ -212,7 +218,7 @@ function App() {
           URL.revokeObjectURL(link.href);
         }
         setGDocsHelpOpen(true);
-        notify('Google Docs opened in a new tab! Notes copied.');
+        notify('Google Drive opened! Document downloaded with all equations ready.');
       } catch (e) {
         notify(e instanceof Error ? e.message : 'Could not prepare Google Docs export.', 'error');
       } finally {
@@ -278,6 +284,7 @@ function App() {
     if (!source) return;
     setLastCleared(source);
     setSource('');
+    setSettings((s) => ({ ...s, title: '' }));
     textarea.current?.focus();
   }
 
@@ -937,12 +944,12 @@ function App() {
                 </div>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
-                {result!.diagnostics.length} {result!.diagnostics.length === 1 ? 'item' : 'items'}
+                {(result?.diagnostics ?? []).length} {(result?.diagnostics ?? []).length === 1 ? 'item' : 'items'}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-              {result!.diagnostics.map((issue) => (
+              {(result?.diagnostics ?? []).map((issue) => (
                 <div
                   key={issue.id}
                   className={`rounded-xl p-4 space-y-1.5 flex gap-3 items-start border ${
@@ -1079,7 +1086,7 @@ function App() {
                       Online
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">Copies formatted notes &amp; opens docs.new</p>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">Opens Google Drive with all equations ready — zero manual paste</p>
                 </div>
               </button>
 
@@ -1263,7 +1270,7 @@ function App() {
       {gdocsHelpOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setGDocsHelpOpen(false)}>
           <div
-            className="modal max-w-md"
+            className="modal max-w-lg"
             role="dialog"
             aria-modal="true"
             aria-labelledby="gdocs-title"
@@ -1272,21 +1279,23 @@ function App() {
             <button className="modal-close" onClick={() => setGDocsHelpOpen(false)} aria-label="Close">
               <X className="w-4 h-4" />
             </button>
-            <div className="w-12 h-12 rounded-full bg-sky-50 flex items-center justify-center mb-3">
-              <ExternalLink className="w-6 h-6 text-sky-600" />
+            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
+              <Check className="w-6 h-6 text-emerald-600 stroke-[2.5]" />
             </div>
-            <h2 id="gdocs-title" className="text-lg font-bold text-slate-900">Google Docs is ready!</h2>
-            <p className="text-xs text-slate-500 mt-1">A new tab has opened with a blank Google Doc.</p>
+            <h2 id="gdocs-title" className="text-lg font-bold text-slate-900">Ready for Google Docs</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Your document <span className="font-semibold text-slate-800">{safeName(settings.title || 'notes')}.docx</span> is downloaded with every math equation and chemistry formula fully rendered.
+            </p>
 
             <div className="space-y-3.5 my-5 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-sky-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                <span className="w-6 h-6 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                   1
                 </span>
                 <div>
-                  <strong className="text-xs text-slate-900 block font-semibold">Paste directly (Fastest)</strong>
+                  <strong className="text-xs text-slate-900 block font-semibold">Drop into Google Drive (Already Done — No Manual Paste!)</strong>
                   <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                    Click inside the new Google Doc tab and press <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">Ctrl</kbd>+<kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">V</kbd> (or <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">⌘</kbd>+<kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">V</kbd>). Your formatted notes, tables, and formulas are already copied!
+                    Simply drag the downloaded <code className="text-brand-600 font-mono text-[10px] bg-white px-1 py-0.5 rounded border border-slate-200">{safeName(settings.title || 'notes')}.docx</code> into your open <strong>Google Drive</strong> tab. Google Docs opens it natively with all formulas, tables, and notes already done — no manual pasting or broken LaTeX!
                   </p>
                 </div>
               </div>
@@ -1296,27 +1305,38 @@ function App() {
                   2
                 </span>
                 <div>
-                  <strong className="text-xs text-slate-900 block font-semibold">Or upload the downloaded .docx</strong>
+                  <strong className="text-xs text-slate-900 block font-semibold">Or paste into a blank document</strong>
                   <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                    We also saved <code className="text-indigo-600 font-mono text-[10px]">{safeName(settings.title)}.docx</code> to your downloads. You can upload it to Google Drive anytime.
+                    Formatted text is also copied to your clipboard. If you prefer a blank document, open a new doc and press <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">⌘</kbd>+<kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">V</kbd>.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 mt-4">
-              <a
-                href="https://docs.new"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>Open Google Doc tab</span>
-              </a>
+            <div className="flex items-center justify-between flex-wrap gap-2.5 mt-4">
+              <div className="flex items-center gap-2">
+                <a
+                  href="https://drive.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Google Drive</span>
+                </a>
+                <a
+                  href="https://docs.new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                  <span>docs.new</span>
+                </a>
+              </div>
               <button
                 type="button"
-                className="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+                className="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer ml-auto"
                 onClick={() => setGDocsHelpOpen(false)}
               >
                 Got it, thanks!

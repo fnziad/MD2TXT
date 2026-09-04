@@ -2,7 +2,7 @@
 
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-serif: Georgia, Cambria, 'Times New Roman', serif;
   --font-mono: 'Fira Code', ui-monospace, monospace;
 
   --color-brand-50: #eef2ff;
@@ -18,8 +18,10 @@
 }
 
 .italic-serif {
-  font-family: 'Instrument Serif', Georgia, serif;
+  font-family: Georgia, Cambria, 'Times New Roman', serif;
   font-style: italic;
+  font-weight: 400;
+  letter-spacing: normal;
 }
 
 /* Document typography & math preview */

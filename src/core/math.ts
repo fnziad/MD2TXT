@@ -138,8 +138,8 @@ function linearMath(node: MmlNode): string {
       }
       return `${base}${node.kind === 'mover' ? '^' : '_'}(${b.trim()})${c ? `^(${c.trim()})` : ''}`;
     }
-    case 'mtable': return `[${values().join('; ')}]`;
-    case 'mtr': return `[${values().join(', ')}]`;
+    case 'mtable': return values().join('; ');
+    case 'mtr': return values().join(', ');
     case 'mtd': return values().join('').trim();
     default: return values().join('');
   }
@@ -205,8 +205,8 @@ function mmlToClipboardHtml(node: MmlNode): string {
       }
       return `${base}${node.kind === 'mover' ? `<sup>${b.trim()}</sup>` : `<sub>${b.trim()}</sub>`}${c ? `<sup>${c.trim()}</sup>` : ''}`;
     }
-    case 'mtable': return `[${values().join('; ')}]`;
-    case 'mtr': return `[${values().join(', ')}]`;
+    case 'mtable': return values().join('; ');
+    case 'mtr': return values().join(', ');
     case 'mtd': return values().join('').trim();
     default: return values().join('');
   }
