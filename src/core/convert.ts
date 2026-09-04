@@ -128,7 +128,7 @@ async function toHtml(tree: Root, math: Record<string, MathResult>, forClipboard
     const id = String(node.properties.id ?? '').replace(/^user-content-/, '');
     const equation = math[id];
     if (equation && parent && index !== undefined) {
-      const body = forClipboard ? escapeHtml(equation.text) : equation.html;
+      const body = forClipboard ? (equation.clipboardHtml ?? escapeHtml(equation.text)) : equation.html;
       const display = equation.display ? ' math-display' : '';
       const title = equation.error ? ` title="${escapeHtml(equation.error)}"` : '';
       const html = `<span class="equation${display}" data-math-id="${id}"${title}>${body}</span>`;

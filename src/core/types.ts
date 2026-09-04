@@ -28,6 +28,7 @@ export type MathResult = {
   html: string;
   svg?: string;
   text: string;
+  clipboardHtml?: string;
   exactText: boolean;
   linearized: boolean;
   widthEx?: number;

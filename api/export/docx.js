@@ -70120,19 +70120,116 @@ MathJaxTexFont.addExtension(MathJaxMhchemFontExtension);
 mathjax.asyncLoad = async () => {
   throw new Error("Dynamic math resources are disabled");
 };
+var SUB_MAP = {
+  "0": "\u2080",
+  "1": "\u2081",
+  "2": "\u2082",
+  "3": "\u2083",
+  "4": "\u2084",
+  "5": "\u2085",
+  "6": "\u2086",
+  "7": "\u2087",
+  "8": "\u2088",
+  "9": "\u2089",
+  "+": "\u208A",
+  "-": "\u208B",
+  "(": "\u208D",
+  ")": "\u208E",
+  "a": "\u2090",
+  "e": "\u2091",
+  "o": "\u2092",
+  "x": "\u2093",
+  "h": "\u2095",
+  "k": "\u2096",
+  "l": "\u2097",
+  "m": "\u2098",
+  "n": "\u2099",
+  "p": "\u209A",
+  "s": "\u209B",
+  "t": "\u209C"
+};
+var SUP_MAP = {
+  "0": "\u2070",
+  "1": "\xB9",
+  "2": "\xB2",
+  "3": "\xB3",
+  "4": "\u2074",
+  "5": "\u2075",
+  "6": "\u2076",
+  "7": "\u2077",
+  "8": "\u2078",
+  "9": "\u2079",
+  "+": "\u207A",
+  "-": "\u207B",
+  "(": "\u207D",
+  ")": "\u207E",
+  "n": "\u207F",
+  "i": "\u2071",
+  "x": "\u02E3",
+  "y": "\u02B8"
+};
+function toSubscript(s) {
+  if (!s || !/^[0-9+\-()aeoxhklmnpst]+$/.test(s)) return null;
+  return [...s].map((c) => SUB_MAP[c] ?? c).join("");
+}
+function toSuperscript(s) {
+  if (!s || !/^[0-9+\-()nixy]+$/.test(s)) return null;
+  return [...s].map((c) => SUP_MAP[c] ?? c).join("");
+}
+function formatChemistry(tex) {
+  const match = tex.trim().match(/^\\ce\{([\s\S]*)\}$/);
+  if (!match) return null;
+  const inner = match[1].trim();
+  const arrowRegex = /->\s*\[([^\]]*)\](?:\[([^\]]*)\])?/g;
+  let html7 = inner.replace(arrowRegex, (_, above, below) => {
+    const parts = [above, below].filter(Boolean).join(", ");
+    return parts ? ` \u2500[${parts}]&rarr; ` : " &rarr; ";
+  });
+  html7 = html7.replace(/<->|<=>/g, " &harr; ");
+  html7 = html7.replace(/->/g, " &rarr; ");
+  html7 = html7.replace(/<-/g, " &larr; ");
+  html7 = html7.replace(/\^{([^}]+)}|\^([0-9+-]+)/g, (_, a, b) => `<sup>${a || b}</sup>`);
+  html7 = html7.replace(/([A-Za-z)\]])(\d+)/g, "$1<sub>$2</sub>");
+  let text8 = inner.replace(arrowRegex, (_, above, below) => {
+    const parts = [above, below].filter(Boolean).join(", ");
+    return parts ? ` \u2500[${parts}]\u2192 ` : " \u2192 ";
+  });
+  text8 = text8.replace(/<->|<=>/g, " \u21CC ");
+  text8 = text8.replace(/->/g, " \u2192 ");
+  text8 = text8.replace(/<-/g, " \u2190 ");
+  text8 = text8.replace(/\^{([^}]+)}|\^([0-9+-]+)/g, (_, a, b) => {
+    const val = a || b;
+    return [...val].map((c) => SUP_MAP[c] ?? c).join("");
+  });
+  text8 = text8.replace(/([A-Za-z)\]])(\d+)/g, (_, letter, digits) => {
+    const subs = [...digits].map((d) => SUB_MAP[d] ?? d).join("");
+    return letter + subs;
+  });
+  return { text: text8.replace(/\s+/g, " ").trim(), html: html7.replace(/\s+/g, " ").trim() };
+}
 function linearMath(node2) {
   const n = node2;
   const children2 = n.childNodes ?? [];
   const values = () => children2.map(linearMath);
   switch (node2.kind) {
-    case "text":
-      return n.getText();
+    case "text": {
+      const t = n.getText();
+      if (t.length === 1) {
+        const code4 = t.charCodeAt(0);
+        if (code4 >= 57344 && code4 <= 63743) return "\u2192";
+      }
+      return t;
+    }
     case "mi":
     case "mn":
     case "mtext":
       return values().join("");
     case "mo": {
       const text8 = values().join("");
+      if (text8.length === 1) {
+        const code4 = text8.charCodeAt(0);
+        if (code4 >= 57344 && code4 <= 63743) return " \u2192 ";
+      }
       return /^[=+−<>≤≥→⇌±×÷↔⇒∈∉]$/.test(text8) ? ` ${text8} ` : text8;
     }
     case "mspace":
@@ -70141,12 +70238,11 @@ function linearMath(node2) {
     case "inferredMrow":
     case "mrow":
     case "TeXAtom":
+    case "mpadded":
+    case "mstyle":
       return values().join("");
-    case "mstyle": {
-      const variant = n.attributes?.getExplicit("mathvariant");
-      if (variant && !["normal", "italic"].includes(variant)) throw new Error("Styled mathematical alphabet");
-      return values().join("");
-    }
+    case "mphantom":
+      return "";
     case "mfrac": {
       const [a, b] = values();
       return `(${a.trim()})/(${b.trim()})`;
@@ -70159,22 +70255,33 @@ function linearMath(node2) {
     }
     case "msub": {
       const [a, b] = values();
-      return `${a.trim()}_(${b.trim()})`;
+      const sub = toSubscript(b.trim());
+      if (!a.trim()) return sub ?? b.trim();
+      return sub ? `${a.trim()}${sub}` : `${a.trim()}_(${b.trim()})`;
     }
     case "msup": {
       const [a, b] = values();
-      return `(${a.trim()})^(${b.trim()})`;
+      const sup = toSuperscript(b.trim());
+      if (!a.trim()) return sup ?? b.trim();
+      return sup ? `${a.trim()}${sup}` : `(${a.trim()})^(${b.trim()})`;
     }
     case "msubsup": {
       const [a, b, c] = values();
+      const sub = toSubscript(b.trim());
+      const sup = toSuperscript(c.trim());
+      if (sub && sup) return `${a.trim()}${sub}${sup}`;
       return `(${a.trim()}_(${b.trim()}))^(${c.trim()})`;
     }
     case "munder":
     case "mover":
     case "munderover": {
-      if (n.attributes?.get("accent") || n.attributes?.get("accentunder")) throw new Error("Accented expression");
       const [a, b, c] = values();
-      return `${a.trim()}${node2.kind === "mover" ? "^" : "_"}(${b.trim()})${c ? `^(${c.trim()})` : ""}`;
+      const base = a.trim();
+      if (base === "\u2192" || base === "\u21CC" || base === "\u2190") {
+        const label = [b, c].map((x) => x?.trim()).filter(Boolean).join(", ");
+        return label ? ` \u2500[${label}]\u2192 ` : ` ${base} `;
+      }
+      return `${base}${node2.kind === "mover" ? "^" : "_"}(${b.trim()})${c ? `^(${c.trim()})` : ""}`;
     }
     case "mtable":
       return `[${values().join("; ")}]`;
@@ -70182,10 +70289,90 @@ function linearMath(node2) {
       return `[${values().join(", ")}]`;
     case "mtd":
       return values().join("").trim();
+    default:
+      return values().join("");
+  }
+}
+function mmlToClipboardHtml(node2) {
+  const n = node2;
+  const children2 = n.childNodes ?? [];
+  const values = () => children2.map(mmlToClipboardHtml);
+  switch (node2.kind) {
+    case "text": {
+      const t = n.getText();
+      if (t.length === 1) {
+        const code4 = t.charCodeAt(0);
+        if (code4 >= 57344 && code4 <= 63743) return "&rarr;";
+      }
+      return escapeHtml(t);
+    }
+    case "mi": {
+      const t = values().join("");
+      return /^[a-zA-Z]$/.test(t) ? `<i>${t}</i>` : t;
+    }
+    case "mn":
+    case "mtext":
+      return values().join("");
+    case "mo": {
+      const text8 = values().join("");
+      if (text8.length === 1) {
+        const code4 = text8.charCodeAt(0);
+        if (code4 >= 57344 && code4 <= 63743) return " &rarr; ";
+      }
+      return /^[=+−<>≤≥→⇌±×÷↔⇒∈∉]$/.test(text8) ? ` ${text8} ` : text8;
+    }
+    case "mspace":
+      return " ";
+    case "math":
+    case "inferredMrow":
+    case "mrow":
+    case "TeXAtom":
+    case "mpadded":
+    case "mstyle":
+      return values().join("");
     case "mphantom":
       return "";
+    case "mfrac": {
+      const [a, b] = values();
+      return `(${a.trim()})/(${b.trim()})`;
+    }
+    case "msqrt":
+      return `&radic;(${values().join("").trim()})`;
+    case "mroot": {
+      const [a, b] = values();
+      return `<sup>${b.trim()}</sup>&radic;(${a.trim()})`;
+    }
+    case "msub": {
+      const [a, b] = values();
+      return `${a.trim()}<sub>${b.trim()}</sub>`;
+    }
+    case "msup": {
+      const [a, b] = values();
+      return `${a.trim()}<sup>${b.trim()}</sup>`;
+    }
+    case "msubsup": {
+      const [a, b, c] = values();
+      return `${a.trim()}<sub>${b.trim()}</sub><sup>${c.trim()}</sup>`;
+    }
+    case "munder":
+    case "mover":
+    case "munderover": {
+      const [a, b, c] = values();
+      const base = a.trim();
+      if (base === "\u2192" || base === "&rarr;" || base === "\u21CC" || base === "\u2190") {
+        const label = [b, c].map((x) => x?.trim()).filter(Boolean).join(", ");
+        return label ? ` \u2500[${label}]&rarr; ` : ` ${base} `;
+      }
+      return `${base}${node2.kind === "mover" ? `<sup>${b.trim()}</sup>` : `<sub>${b.trim()}</sub>`}${c ? `<sup>${c.trim()}</sup>` : ""}`;
+    }
+    case "mtable":
+      return `[${values().join("; ")}]`;
+    case "mtr":
+      return `[${values().join(", ")}]`;
+    case "mtd":
+      return values().join("").trim();
     default:
-      throw new Error(`No unambiguous text representation for ${node2.kind}`);
+      return values().join("");
   }
 }
 async function renderMath(tex, display) {
@@ -70217,12 +70404,18 @@ async function renderMath(tex, display) {
     const rendered = await document4.convertPromise(tex, { display, em: 16, ex: 8, containerWidth: 640 });
     const html7 = adaptor.outerHTML(rendered);
     if (html7.includes('data-mml-node="merror"')) return failure("The equation could not be rendered. Check its commands and braces.");
-    let text8 = tex;
-    let linearized = true;
-    try {
-      text8 = linearMath(input.parseOptions.root).replace(/[ \t]+/g, " ").trim();
-    } catch {
-      linearized = false;
+    const chem = formatChemistry(tex);
+    let text8 = chem?.text ?? tex;
+    let clipboardHtml = chem?.html;
+    let linearized = !!chem;
+    if (!chem) {
+      try {
+        text8 = linearMath(input.parseOptions.root).replace(/[ \t]+/g, " ").trim();
+        clipboardHtml = mmlToClipboardHtml(input.parseOptions.root).replace(/[ \t]+/g, " ").trim();
+        linearized = true;
+      } catch {
+        linearized = false;
+      }
     }
     const exactText = linearized && /^[\p{L}\p{N}\p{S}\p{P}]$/u.test(text8) && !/[{}\\]/.test(text8);
     const svg3 = html7.match(/<svg\b[\s\S]*<\/svg>/)?.[0];
@@ -70233,6 +70426,7 @@ async function renderMath(tex, display) {
       html: exactText ? `<span class="math-symbol">${escapeHtml(text8)}</span>` : html7,
       svg: svg3,
       text: text8,
+      clipboardHtml,
       exactText,
       linearized,
       widthEx: Number(svg3.match(/width="([\d.]+)ex"/)?.[1] ?? 1),
@@ -70392,7 +70586,7 @@ async function toHtml2(tree, math2, forClipboard) {
     const id = String(node2.properties.id ?? "").replace(/^user-content-/, "");
     const equation = math2[id];
     if (equation && parent && index2 !== void 0) {
-      const body3 = forClipboard ? escapeHtml(equation.text) : equation.html;
+      const body3 = forClipboard ? equation.clipboardHtml ?? escapeHtml(equation.text) : equation.html;
       const display = equation.display ? " math-display" : "";
       const title = equation.error ? ` title="${escapeHtml(equation.error)}"` : "";
       const html7 = `<span class="equation${display}" data-math-id="${id}"${title}>${body3}</span>`;

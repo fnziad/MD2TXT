@@ -7,8 +7,10 @@ import {
   ExternalLink,
   FileDown,
   FileText,
+  FlaskConical,
   LoaderCircle,
   RotateCcw,
+  Sigma,
   Sliders,
   Sparkles,
   X,
@@ -184,6 +186,8 @@ function App() {
     allowFallback = false
   ) {
     if (kind === 'gdocs') {
+      // Open new tab synchronously in direct user click turn to avoid browser popup blockers
+      const docsTab = window.open('https://docs.new', '_blank');
       setExporting('gdocs');
       try {
         if (result && navigator.clipboard.write && window.ClipboardItem) {
@@ -207,9 +211,8 @@ function App() {
           link.click();
           URL.revokeObjectURL(link.href);
         }
-        window.open('https://docs.new', '_blank', 'noopener,noreferrer');
         setGDocsHelpOpen(true);
-        notify('Google Docs opened in a new tab!');
+        notify('Google Docs opened in a new tab! Notes copied.');
       } catch (e) {
         notify(e instanceof Error ? e.message : 'Could not prepare Google Docs export.', 'error');
       } finally {
@@ -304,12 +307,13 @@ function App() {
 
   const hasIssues = errors.length > 0 || warnings.length > 0;
   const statusLabel = useMemo(() => {
+    if (!source.trim()) return 'Waiting for notes…';
     if (busy) return 'Formatting notes…';
     if (error) return 'Render error';
     if (errors.length > 0) return `${errors.length} issue${errors.length === 1 ? '' : 's'} (view)`;
     if (warnings.length > 0) return `${warnings.length} formatting tip${warnings.length === 1 ? '' : 's'} (view)`;
     return 'All clear · Ready to download';
-  }, [busy, error, errors.length, warnings.length]);
+  }, [source, busy, error, errors.length, warnings.length]);
 
   function handleStatusClick() {
     if (hasIssues) {
@@ -320,8 +324,8 @@ function App() {
   return (
     <div className="bg-[#f5f7fb] text-slate-800 antialiased font-sans min-h-screen flex flex-col">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200/80 px-4 lg:px-8 py-2.5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200/80 px-4 sm:px-6 lg:px-10 py-2.5">
+        <div className="max-w-[1440px] mx-auto flex items-center justify-between">
           {/* Logo and App Title */}
           <div className="flex items-center gap-3">
             <a href="#top" className="flex items-center gap-3 group">
@@ -349,20 +353,30 @@ function App() {
                 ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
                 : busy
                   ? 'bg-slate-100 border-slate-200 text-slate-700'
-                  : hasIssues
-                    ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100/70 cursor-pointer'
-                    : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100/70 cursor-pointer'
+                  : !source.trim()
+                    ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-default'
+                    : hasIssues
+                      ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-pointer'
+                      : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100/70 cursor-pointer'
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                errors.length || error ? 'bg-rose-500' : busy ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'
+                errors.length || error
+                  ? 'bg-rose-500'
+                  : busy
+                    ? 'bg-slate-400'
+                    : !source.trim()
+                      ? 'bg-slate-300'
+                      : 'bg-emerald-500 animate-pulse'
               }`}
             />
             {busy ? (
               <LoaderCircle className="w-3.5 h-3.5 spin" />
             ) : errors.length || error ? (
               <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+            ) : !source.trim() ? (
+              <FileText className="w-3.5 h-3.5 text-slate-400" />
             ) : (
               <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
             )}
@@ -374,8 +388,8 @@ function App() {
             <button
               type="button"
               onClick={() => startDownloadPrompt('pdf')}
-              disabled={!source || busy}
-              className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!source.trim() || busy}
+              className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <FileDown className="w-4 h-4" />
               <span>Download PDF</span>
@@ -385,31 +399,31 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main id="top" className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-7">
+      <main id="top" className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-10 space-y-8">
         {/* Hero Section */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2 pb-4">
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_380px] gap-10 lg:gap-14 items-center pt-2 pb-4">
           {/* Left Column: Copy & Samples */}
-          <div className="lg:col-span-7 space-y-5">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider text-brand-600 uppercase">
+          <div className="space-y-4 sm:space-y-5">
+            <div className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.14em] text-brand-600 uppercase">
               <Sparkles className="w-3.5 h-3.5" />
               <span>DESIGNED FOR STUDENTS, RESEARCHERS &amp; LEARNERS</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-[54px] tracking-tight font-extrabold text-slate-900 leading-[1.08]">
+            <h1 className="text-4xl sm:text-5xl lg:text-[58px] tracking-tight font-extrabold text-slate-900 leading-[1.06]">
               Your notes, <br />
               <span className="italic-serif text-brand-500 font-normal tracking-normal text-[1.12em]">
                 beautifully translated.
               </span>
             </h1>
 
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
+            <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-2xl font-normal">
               Paste Markdown from Gemini, ChatGPT, Claude, or any AI tool. Keep every math formula, chemistry equation,
               table, and formatted detail clean and readable.
             </p>
 
-            {/* Quick Sample Buttons */}
+            {/* Quick Sample Buttons & Clear Option */}
             <div className="pt-2 flex flex-wrap items-center gap-2.5">
-              <span className="text-xs text-slate-400 font-medium mr-1">Try sample:</span>
+              <span className="text-xs text-slate-500 font-semibold mr-1">Try sample:</span>
               <button
                 type="button"
                 onClick={() => {
@@ -417,9 +431,9 @@ function App() {
                   setSettings((s) => ({ ...s, title: 'Science & Chemistry Notes' }));
                   notify('Loaded Science sample');
                 }}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
               >
-                <span>🧪</span>
+                <FlaskConical className="w-3.5 h-3.5 text-indigo-500" />
                 <span>Science &amp; Chem</span>
               </button>
 
@@ -430,7 +444,7 @@ function App() {
                   setSettings((s) => ({ ...s, title: 'Cell Biology - RasGAP Pathway' }));
                   notify('Loaded Biology sample');
                 }}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
               >
                 <span>🧬</span>
                 <span>Biology &amp; Pathways</span>
@@ -443,16 +457,45 @@ function App() {
                   setSettings((s) => ({ ...s, title: 'Math & Equations Sheet' }));
                   notify('Loaded Math sample');
                 }}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-brand-600 shadow-xs transition-colors cursor-pointer"
               >
-                <span className="font-serif font-bold text-sm">∑</span>
+                <Sigma className="w-3.5 h-3.5 text-indigo-500 stroke-[2.5]" />
                 <span>Math &amp; Equations</span>
               </button>
+
+              {/* Clear / Start Fresh Option */}
+              {source.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clear();
+                    notify('Notes cleared · Ready for your notes');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 shadow-xs transition-colors cursor-pointer"
+                  title="Clear notes and start with a blank editor"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Clear sample</span>
+                </button>
+              ) : lastCleared ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSource(lastCleared);
+                    notify('Restored previous notes');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-50 text-brand-600 border border-indigo-200 hover:bg-indigo-100 shadow-xs transition-colors cursor-pointer"
+                  title="Restore cleared notes"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restore notes</span>
+                </button>
+              ) : null}
             </div>
           </div>
 
           {/* Right Column: Workflow Pipeline Stepper Card */}
-          <div className="lg:col-span-5">
+          <div>
             <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-sm space-y-2">
               {/* Step 1: Input */}
               <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100">
@@ -1261,7 +1304,16 @@ function App() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3 mt-4">
+              <a
+                href="https://docs.new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Google Doc tab</span>
+              </a>
               <button
                 type="button"
                 className="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
