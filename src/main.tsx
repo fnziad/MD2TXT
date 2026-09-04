@@ -98,12 +98,12 @@ function App() {
       if (!response.ok) {
         const problem = await response.json().catch(() => ({ message: 'Export failed.' }));
         if (response.status === 422) { setShowFallback(true); notify('Resolve the highlighted issues or use source fallbacks.', 'error'); return; }
-        throw new Error(problem.message);
+        throw new Error(problem.message || `Export failed (HTTP ${response.status}).`);
       }
       const blob = await response.blob();
       const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${safeName(settings.title)}.${kind}`; link.click(); URL.revokeObjectURL(link.href);
       setShowFallback(false); notify(`${kind.toUpperCase()} downloaded`);
-    } catch (e) { notify(e instanceof Error ? e.message : 'Export failed.', 'error'); }
+    } catch (e) { notify(e instanceof Error ? e.message : 'Export failed. Check the deployment logs.', 'error'); }
     finally { setExporting(undefined); }
   }
   function selectIssue(issue: Diagnostic) {
