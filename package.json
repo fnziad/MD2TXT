@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx server/index.ts",
-    "build": "tsc --noEmit && vite build",
+    "build:api": "esbuild server/api/pdf.ts --bundle --platform=node --format=esm --target=node22 --external:@sparticuz/chromium --external:playwright-core --outfile=api/export/pdf.js && esbuild server/api/docx.ts --bundle --platform=node --format=esm --target=node22 --external:@sparticuz/chromium --external:playwright-core --outfile=api/export/docx.js && esbuild server/api/index.ts --bundle --platform=node --format=esm --target=node22 --outfile=api/index.js",
+    "build": "tsc --noEmit && vite build && npm run build:api",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",

@@ -1,4 +1,4 @@
-import { exportDocx } from '../../server/docx';
+import { exportDocx } from '../docx';
 import { DEFAULT_SETTINGS, type DocumentSettings } from '../../src/core/types';
 
 function filename(title: string, ext: string) {

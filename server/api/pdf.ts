@@ -1,4 +1,4 @@
-import { exportPdf, ExportBlocked } from '../../server/pdf';
+import { exportPdf, ExportBlocked } from '../pdf';
 import { DEFAULT_SETTINGS, type DocumentSettings } from '../../src/core/types';
 
 function filename(title: string, ext: string) {
@@ -31,4 +31,3 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ message: error instanceof Error ? error.message : 'Export failed.' });
   }
 }
-
