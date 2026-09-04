@@ -7,10 +7,8 @@ import { withPage } from './browser';
 async function equationPng(result: MathResult) {
   return withPage(async (page) => {
     await page.setViewportSize({ width: 1200, height: 500 });
-    await page.setContent(`<style>body{margin:12px;background:white;display:inline-block}svg{display:block;height:auto;max-height:400px}</style>${result.svg}`);
-    const box = await page.locator('body > svg').boundingBox();
-    if (!box) throw new Error('Equation image was unavailable.');
-    return page.screenshot({ type: 'png', clip: { x: Math.max(0, box.x), y: Math.max(0, box.y), width: Math.min(1176, Math.ceil(box.width)), height: Math.min(476, Math.ceil(box.height)) } });
+    await page.setContent(`<style>body{margin:0;padding:8px;background:white;display:inline-block}#eq-wrap{display:inline-block}svg{display:inline-block;height:auto;max-height:400px}</style><div id="eq-wrap">${result.svg}</div>`);
+    return page.locator('#eq-wrap').screenshot({ type: 'png' });
   });
 }
 
