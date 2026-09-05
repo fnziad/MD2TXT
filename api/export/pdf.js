@@ -51340,9 +51340,9 @@ async function renderMath(tex, display) {
         throw error;
       }
     });
-    const output = new SVG({ fontCache: "none", fontData: MathJaxTexFont });
+    const output = new SVG({ fontCache: "none", fontData: MathJaxTexFont, linebreaks: false });
     const document4 = mathjax.document("", { InputJax: input, OutputJax: output });
-    const rendered = await document4.convertPromise(tex, { display, em: 16, ex: 8, containerWidth: 640 });
+    const rendered = await document4.convertPromise(tex, { display, em: 16, ex: 8 });
     const html7 = adaptor.outerHTML(rendered);
     if (html7.includes('data-mml-node="merror"')) return failure("The equation could not be rendered. Check its commands and braces.");
     const chem = formatChemistry(tex);

@@ -22,6 +22,10 @@ test('supports dollar, bracket, display, matrix, chemistry, and GFM table math',
   assert.match(result.plainText, /বাংলা/);
   assert.equal(result.diagnostics.some((d) => d.code === 'math-error'), false);
   assert.equal(result.diagnostics.some((d) => d.severity === 'error'), false);
+  assert.equal(result.html.includes('mjx-break'), false);
+  const alphaEq = Object.values(result.math).find((m) => m.tex.includes('\\leq'));
+  assert.ok(alphaEq);
+  assert.equal(alphaEq.widthEx! > 8, true);
 });
 
 test('currency, escaped delimiters, and code remain literal', async () => {

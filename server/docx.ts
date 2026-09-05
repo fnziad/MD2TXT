@@ -12,7 +12,7 @@ async function renderEquationImages(math: Record<string, MathResult>): Promise<M
   try {
     await withPage(async (page) => {
       await page.setViewportSize({ width: 1200, height: 4000 });
-      const divs = toRender.map((m, i) => `<div id="eq-wrap-${i}" style="display:inline-block;padding:4px;background:white;margin:4px">${m.svg}</div>`).join('\n');
+      const divs = toRender.map((m, i) => `<div id="eq-wrap-${i}" style="display:inline-block;padding:1px;background:white;margin:4px">${m.svg}</div>`).join('\n');
       await page.setContent(`<style>body{margin:0;padding:0;background:white}svg{display:inline-block;height:auto;max-height:400px}</style><div>${divs}</div>`, { waitUntil: 'domcontentloaded', timeout: 20000 });
       for (let i = 0; i < toRender.length; i++) {
         const m = toRender[i];

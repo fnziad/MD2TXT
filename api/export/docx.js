@@ -70399,9 +70399,9 @@ async function renderMath(tex, display) {
         throw error;
       }
     });
-    const output = new SVG({ fontCache: "none", fontData: MathJaxTexFont });
+    const output = new SVG({ fontCache: "none", fontData: MathJaxTexFont, linebreaks: false });
     const document4 = mathjax.document("", { InputJax: input, OutputJax: output });
-    const rendered = await document4.convertPromise(tex, { display, em: 16, ex: 8, containerWidth: 640 });
+    const rendered = await document4.convertPromise(tex, { display, em: 16, ex: 8 });
     const html7 = adaptor.outerHTML(rendered);
     if (html7.includes('data-mml-node="merror"')) return failure("The equation could not be rendered. Check its commands and braces.");
     const chem = formatChemistry(tex);
@@ -70714,7 +70714,7 @@ async function renderEquationImages(math2) {
   try {
     await withPage(async (page) => {
       await page.setViewportSize({ width: 1200, height: 4e3 });
-      const divs = toRender.map((m, i) => `<div id="eq-wrap-${i}" style="display:inline-block;padding:4px;background:white;margin:4px">${m.svg}</div>`).join("\n");
+      const divs = toRender.map((m, i) => `<div id="eq-wrap-${i}" style="display:inline-block;padding:1px;background:white;margin:4px">${m.svg}</div>`).join("\n");
       await page.setContent(`<style>body{margin:0;padding:0;background:white}svg{display:inline-block;height:auto;max-height:400px}</style><div>${divs}</div>`, { waitUntil: "domcontentloaded", timeout: 2e4 });
       for (let i = 0; i < toRender.length; i++) {
         const m = toRender[i];

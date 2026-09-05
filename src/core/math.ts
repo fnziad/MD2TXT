@@ -228,9 +228,9 @@ export async function renderMath(tex: string, display: boolean): Promise<MathRes
       maxBuffer: LIMITS.equationChars, maxMacros: 1000, tags: 'none',
       formatError: (_: unknown, error: Error) => { throw error; },
     });
-    const output = new SVG({ fontCache: 'none', fontData: MathJaxTexFont });
+    const output = new SVG({ fontCache: 'none', fontData: MathJaxTexFont, linebreaks: false as any });
     const document = mathjax.document('', { InputJax: input, OutputJax: output });
-    const rendered = await document.convertPromise(tex, { display, em: 16, ex: 8, containerWidth: 640 });
+    const rendered = await document.convertPromise(tex, { display, em: 16, ex: 8 });
     const html = adaptor.outerHTML(rendered);
     if (html.includes('data-mml-node="merror"')) return failure('The equation could not be rendered. Check its commands and braces.');
     
