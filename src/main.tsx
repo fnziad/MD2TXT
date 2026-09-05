@@ -333,7 +333,7 @@ function App() {
   }
 
   return (
-    <div className="bg-[#f5f7fb] text-slate-800 antialiased font-sans min-h-screen flex flex-col">
+    <div className="bg-[#f5f7fb] text-slate-800 antialiased font-sans min-h-[100dvh] flex flex-col flex-1 overflow-x-hidden">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200/80 px-4 sm:px-6 lg:px-10 py-2.5">
         <div className="max-w-[1440px] mx-auto flex items-center justify-between">
@@ -506,20 +506,20 @@ function App() {
 
             {/* Mobile Compact Stepper (< lg) */}
             <div className="lg:hidden grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-white border border-slate-200/90 shadow-xs text-center mt-3">
-              <div className="flex flex-col items-center py-1">
+              <div className="flex flex-col items-center py-1 min-w-0">
                 <span className="w-4 h-4 rounded-full bg-slate-100 text-[10px] font-mono flex items-center justify-center font-bold text-slate-600 mb-0.5">1</span>
-                <span className="text-[11px] font-bold text-slate-800">Paste Notes</span>
-                <span className="text-[9px] text-slate-400">AI / Markdown</span>
+                <span className="text-[11px] font-bold text-slate-800 truncate w-full">Paste Notes</span>
+                <span className="text-[9px] text-slate-400 truncate w-full">AI / Markdown</span>
               </div>
-              <div className="flex flex-col items-center py-1 border-x border-slate-100 px-1">
+              <div className="flex flex-col items-center py-1 border-x border-slate-100 px-1 min-w-0">
                 <span className="w-4 h-4 rounded-full bg-indigo-50 text-[10px] font-mono flex items-center justify-center font-bold text-brand-600 mb-0.5">2</span>
-                <span className="text-[11px] font-bold text-slate-800">Smart Format</span>
-                <span className="text-[9px] text-slate-400">Math &amp; Tables</span>
+                <span className="text-[11px] font-bold text-slate-800 truncate w-full">Smart Format</span>
+                <span className="text-[9px] text-slate-400 truncate w-full">Math &amp; Tables</span>
               </div>
-              <div className="flex flex-col items-center py-1">
+              <div className="flex flex-col items-center py-1 min-w-0">
                 <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] font-mono flex items-center justify-center font-bold text-white mb-0.5">3</span>
-                <span className="text-[11px] font-bold text-brand-700">Export Ready</span>
-                <span className="text-[9px] text-slate-400">PDF / Word / Docs</span>
+                <span className="text-[11px] font-bold text-brand-700 truncate w-full">Export Ready</span>
+                <span className="text-[9px] text-slate-400 truncate w-full">PDF / Word / Docs</span>
               </div>
             </div>
           </div>
@@ -701,29 +701,29 @@ function App() {
           <button
             type="button"
             onClick={() => setMobileTab('editor')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
               mobileTab === 'editor'
                 ? 'bg-editor-bg text-white shadow-xs font-semibold'
                 : 'text-slate-700 hover:text-slate-900'
             }`}
           >
-            <PenLine className="w-3.5 h-3.5" />
-            <span>Editor</span>
+            <PenLine className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Editor</span>
           </button>
 
           <button
             type="button"
             onClick={() => setMobileTab('preview')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
               mobileTab === 'preview'
                 ? 'bg-white text-slate-900 shadow-xs font-semibold'
                 : 'text-slate-700 hover:text-slate-900'
             }`}
           >
-            <Eye className="w-3.5 h-3.5 text-brand-600" />
-            <span>Live Preview</span>
+            <Eye className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+            <span className="truncate">Live Preview</span>
             {result?.stats.equations ? (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-brand-600 font-bold">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-brand-600 font-bold shrink-0">
                 {result.stats.equations}∑
               </span>
             ) : null}
@@ -732,14 +732,14 @@ function App() {
           <button
             type="button"
             onClick={() => setMobileTab('both')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
               mobileTab === 'both'
                 ? 'bg-indigo-600 text-white shadow-xs font-semibold'
                 : 'text-slate-700 hover:text-slate-900'
             }`}
           >
-            <Columns className="w-3.5 h-3.5" />
-            <span>Split Both</span>
+            <Columns className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Split Both</span>
           </button>
         </div>
 
@@ -1214,7 +1214,7 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto py-8 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
+      <footer className="mt-auto pt-8 pb-[max(2rem,calc(2rem+env(safe-area-inset-bottom,0px)))] border-t border-slate-200 bg-white text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p className="font-semibold text-slate-700">MD2TXT — AI Notes to Beautiful Documents</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-[11px] text-slate-400">
